@@ -1,9 +1,7 @@
 :root {
   --ink: #0a0c10;
   --paper: #f1ede2;
-  --paper-dim: #a8a49a;
   --line: rgba(241, 237, 226, 0.14);
-  --line-strong: rgba(241, 237, 226, 0.34);
   --font: "DotGothic16", monospace;
 }
 
@@ -101,53 +99,24 @@ main {
 .grid-line.vertical {
   top: 0;
   bottom: 0;
-  width: 2px;
+  width: 1px;
   background: repeating-linear-gradient(180deg, var(--paper) 0 4px, transparent 4px 8px);
+  animation: flow-v 1.5s linear infinite;
 }
 
 .grid-line.horizontal {
   left: 0;
   right: 0;
-  height: 2px;
+  height: 1px;
   background: repeating-linear-gradient(90deg, var(--paper) 0 4px, transparent 4px 8px);
+  animation: flow-h 1.5s linear infinite;
 }
 
-.grid-line::after {
-  content: "";
-  position: absolute;
-  background: var(--paper);
-}
+/* 隣り合う線は逆向きに流れる */
+.grid-line.flip { animation-direction: reverse; }
 
-.grid-line.vertical::after {
-  left: 0;
-  top: 0;
-  width: 2px;
-  height: 24px;
-  transform: translateY(-24px);
-  animation: pass-v 4s linear infinite;
-}
-
-.grid-line.horizontal::after {
-  left: 0;
-  top: 0;
-  width: 24px;
-  height: 2px;
-  transform: translateX(-24px);
-  animation: pass-h 4s linear infinite;
-}
-
-/* 普段は静止した点線のまま、周期の中で一度だけ粒が端から端へ通過する。往復はしない(両端とも画面外で切り替わるので継ぎ目が見えない) */
-@keyframes pass-h {
-  0%, 70%  { transform: translateX(-24px); }
-  92%      { transform: translateX(calc(100% + 24px)); }
-  100%     { transform: translateX(calc(100% + 24px)); }
-}
-
-@keyframes pass-v {
-  0%, 70%  { transform: translateY(-24px); }
-  92%      { transform: translateY(calc(100% + 24px)); }
-  100%     { transform: translateY(calc(100% + 24px)); }
-}
+@keyframes flow-h { to { background-position: -8px 0; } }
+@keyframes flow-v { to { background-position: 0 -8px; } }
 
 .entry {
   position: relative;
@@ -181,9 +150,9 @@ main {
 .ray {
   position: absolute;
   width: 100%;
-  height: 2px;
+  height: 1px;
   transform-origin: 0 0;
-  background: linear-gradient(90deg, var(--line-strong), rgba(241, 237, 226, 0));
+  background: repeating-linear-gradient(90deg, var(--paper) 0 4px, transparent 4px 8px);
   clip-path: inset(0 0 0 100%);
   transition: clip-path 0.25s ease-out;
 }
@@ -235,7 +204,7 @@ main {
   max-width: 2360px;
   margin: 0 auto;
   padding: 28px 56px 56px;
-  color: var(--paper-dim);
+  color: var(--paper);
   font-size: 13px;
 }
 
@@ -316,7 +285,7 @@ main {
 }
 
 .viewer-meta { align-self: center; }
-.viewer-index { color: var(--paper-dim); font-size: 13px; }
+.viewer-index { color: var(--paper); font-size: 13px; }
 
 .viewer-meta h2 {
   margin: 8px 0 20px;
@@ -335,9 +304,9 @@ main {
   letter-spacing: 0.03em;
 }
 
-.viewer-fields dt { color: var(--paper-dim); text-transform: uppercase; }
+.viewer-fields dt { color: var(--paper); text-transform: uppercase; }
 .viewer-fields dd { margin: 0; }
-#viewer-note { max-width: 40ch; color: var(--paper-dim); font-size: 14px; }
+#viewer-note { max-width: 40ch; color: var(--paper); font-size: 14px; }
 
 @media (hover: none) and (pointer: coarse) {
   body { cursor: default; }
@@ -360,5 +329,5 @@ main {
   * { transition: none !important; }
   .splash { animation: none; display: none; }
   .splash-text { animation: none; }
-  .grid-line::after { animation: none; transform: translateX(-9999px); }
+  .grid-line { animation: none; background-position: 0 0; }
 }
