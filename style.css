@@ -126,6 +126,15 @@ main {
   aspect-ratio: 1;
   container-type: inline-size;
   cursor: pointer;
+  pointer-events: none;
+}
+
+/* ホバー・クリックの反応範囲は、マス中央の60%四方だけ */
+.entry::after {
+  content: "";
+  position: absolute;
+  inset: 20%;
+  pointer-events: auto;
 }
 
 /* ホバー中の作品を最背面にして、斜線が他の作品の写真・文字の前に出ないようにする */
