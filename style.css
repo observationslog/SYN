@@ -3,6 +3,7 @@
   --paper: #f1ede2;
   --line: rgba(241, 237, 226, 0.14);
   --font: "DotGothic16", monospace;
+  --flow: 0.1s;
 }
 
 * { box-sizing: border-box; text-decoration: none; }
@@ -15,7 +16,7 @@ body {
   font-family: var(--font);
   font-size: 16px;
   line-height: 1.7;
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' shape-rendering='crispEdges'%3E%3Cg fill='none' stroke='%23f1ede2' stroke-width='1.5'%3E%3Cpath d='M2 10V2h8'/%3E%3Cpath d='M22 2h8v8'/%3E%3Cpath d='M30 22v8h-8'/%3E%3Cpath d='M10 30H2v-8'/%3E%3Ccircle cx='16' cy='16' r='1.4' fill='%23f1ede2'/%3E%3Cpath d='M16 6v4M16 22v4M6 16h4M22 16h4' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E") 16 16, crosshair;
+  cursor: url("cursor.png") 16 16, crosshair;
 }
 
 a { color: inherit; }
@@ -84,6 +85,7 @@ main {
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
   position: relative;
+  overflow: clip; /* 斜線が枠の外へはみ出して横スクロールを出さない */
 }
 
 .grid-lines {
@@ -101,7 +103,7 @@ main {
   bottom: 0;
   width: 1px;
   background: repeating-linear-gradient(180deg, var(--paper) 0 4px, transparent 4px 8px);
-  animation: flow-v 1.5s linear infinite;
+  animation: flow-v var(--flow) linear infinite;
 }
 
 .grid-line.horizontal {
@@ -109,7 +111,7 @@ main {
   right: 0;
   height: 1px;
   background: repeating-linear-gradient(90deg, var(--paper) 0 4px, transparent 4px 8px);
-  animation: flow-h 1.5s linear infinite;
+  animation: flow-h var(--flow) linear infinite;
 }
 
 /* 隣り合う線は逆向きに流れる */
@@ -120,11 +122,14 @@ main {
 
 .entry {
   position: relative;
+  z-index: 1;
   aspect-ratio: 1;
-  background: var(--ink);
   container-type: inline-size;
   cursor: pointer;
 }
+
+/* ホバー中の作品を最背面にして、斜線が他の作品の写真・文字の前に出ないようにする */
+.entry:hover { z-index: 0; }
 
 .entry-thumb {
   position: absolute;
@@ -147,24 +152,25 @@ main {
   pointer-events: none;
 }
 
+/* 斜線は低解像度のドット絵(ray.png)を拡大したもの。写真の角から隣の作品の写真の角まで届く */
 .ray {
   position: absolute;
-  width: 100%;
-  height: 1px;
-  transform-origin: 0 0;
-  background: repeating-linear-gradient(90deg, var(--paper) 0 4px, transparent 4px 8px);
-  clip-path: inset(0 0 0 100%);
+  width: 66.667%;
+  aspect-ratio: 1;
+  background: url("ray.png") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  clip-path: inset(0 100% 100% 0);
   transition: clip-path 0.25s ease-out;
 }
+
+.ray-tl { left: -33.333%; top: -33.333%; }
+.ray-tr { left: 66.667%; top: -33.333%; transform: scaleX(-1); }
+.ray-bl { left: -33.333%; top: 66.667%; transform: scaleX(-1); clip-path: inset(100% 0 0 100%); }
+.ray-br { left: 66.667%; top: 66.667%; clip-path: inset(100% 0 0 100%); }
 
 @media (hover:hover) and (pointer:fine) {
   .entry:hover .ray { clip-path: inset(0); }
 }
-
-.ray-tl { left: 33.333%; top: 33.333%; transform: rotate(225deg); }
-.ray-tr { left: 66.667%; top: 33.333%; transform: rotate(315deg); }
-.ray-bl { left: 33.333%; top: 66.667%; transform: rotate(135deg); }
-.ray-br { left: 66.667%; top: 66.667%; transform: rotate(45deg); }
 
 .entry-title {
   position: absolute;
@@ -216,7 +222,8 @@ main {
   display: none;
   transform: translate(-16px, -16px);
   pointer-events: none;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' shape-rendering='crispEdges'%3E%3Cg fill='none' stroke='%23f1ede2' stroke-width='1.5'%3E%3Cpath d='M2 10V2h8'/%3E%3Cpath d='M22 2h8v8'/%3E%3Cpath d='M30 22v8h-8'/%3E%3Cpath d='M10 30H2v-8'/%3E%3Ccircle cx='16' cy='16' r='1.4' fill='%23f1ede2'/%3E%3Cpath d='M16 6v4M16 22v4M6 16h4M22 16h4' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+  background: url("cursor.png") center / contain no-repeat;
+  image-rendering: pixelated;
 }
 
 .tap-crosshair.is-visible { display: block; }

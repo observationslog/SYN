@@ -18,7 +18,6 @@ const viewerClose = document.querySelector(".viewer-close");
 const MOBILE_QUERY = "(max-width: 640px)";
 const COLUMNS_MOBILE = 3;
 const COLUMNS_DESKTOP = 4;
-const GRID_PERIOD = 4;
 
 function formatCoords(x, y) {
   return `${String(Math.round(x)).padStart(4, "0")} ${String(Math.round(y)).padStart(4, "0")}`;
@@ -75,27 +74,16 @@ function renderGridLines(columns, rows) {
   gridLines.className = "grid-lines";
   gridLines.setAttribute("aria-hidden", "true");
 
-  const lines = [];
-  for (let column = 1; column < columns; column++) {
-    lines.push({ orientation: "vertical", position: `${(100 / columns) * column}%` });
-  }
-  for (let row = 1; row < rows; row++) {
-    lines.push({ orientation: "horizontal", position: `${(100 / rows) * row}%` });
-  }
-
-  for (let i = lines.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [lines[i], lines[j]] = [lines[j], lines[i]];
-  }
-
-  const slot = GRID_PERIOD / lines.length;
-  lines.forEach((lineData, index) => {
+  // 隣り合う線は逆向きに流す(奇数番目だけ flip)
+  const addLine = (orientation, index, count) => {
     const line = document.createElement("span");
-    line.className = `grid-line ${lineData.orientation}`;
-    line.style[lineData.orientation === "vertical" ? "left" : "top"] = lineData.position;
-    line.style.animationDelay = `${(index * slot + Math.random() * slot * 0.6).toFixed(2)}s`;
+    line.className = `grid-line ${orientation}${index % 2 ? " flip" : ""}`;
+    line.style[orientation === "vertical" ? "left" : "top"] = `${(100 / count) * index}%`;
     gridLines.appendChild(line);
-  });
+  };
+
+  for (let column = 1; column < columns; column++) addLine("vertical", column, columns);
+  for (let row = 1; row < rows; row++) addLine("horizontal", row, rows);
 
   return gridLines;
 }
