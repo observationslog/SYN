@@ -8,24 +8,21 @@ const viewer = document.getElementById("viewer");
 const viewerImage = document.getElementById("viewer-image");
 const viewerIndex = document.getElementById("viewer-index");
 const viewerTitle = document.getElementById("viewer-title");
-const viewerRoad = document.getElementById("viewer-road");
-const viewerLocation = document.getElementById("viewer-location");
-const viewerObserved = document.getElementById("viewer-observed");
-const viewerGenerated = document.getElementById("viewer-generated");
-const viewerNote = document.getElementById("viewer-note");
-const viewerClose = document.querySelector(".viewer-close");
+const viewerFields = ["road", "location", "observed", "generated", "note"]
+  .map((key) => [key, document.getElementById(`viewer-${key}`)]);
 
-const MOBILE_QUERY = "(max-width: 640px)";
-const COLUMNS_MOBILE = 3;
-const COLUMNS_DESKTOP = 4;
+// style.css の @media (max-width: 640px) と揃える
+const mobileQuery = window.matchMedia("(max-width: 640px)");
+const currentColumns = () => (mobileQuery.matches ? 3 : 4);
 
-function formatCoords(x, y) {
-  return `${String(Math.round(x)).padStart(4, "0")} ${String(Math.round(y)).padStart(4, "0")}`;
-}
+const pad = (value, length) => String(value).padStart(length, "0");
+const altText = (work) => work.title || work.location;
 
+setTimeout(() => splash.remove(), 2100);
+
+// ---- 座標(スマホでは最後に触れた位置) ----
 function updatePointer(x, y, showCrosshair = false) {
-  pageCoords.textContent = formatCoords(x, y);
-
+  pageCoords.textContent = `${pad(Math.round(x), 4)} ${pad(Math.round(y), 4)}`;
   if (showCrosshair) {
     tapCrosshair.style.left = `${x}px`;
     tapCrosshair.style.top = `${y}px`;
@@ -33,42 +30,27 @@ function updatePointer(x, y, showCrosshair = false) {
   }
 }
 
-document.addEventListener("mousemove", (event) => {
-  updatePointer(event.pageX, event.pageY);
-});
-
+document.addEventListener("mousemove", (event) => updatePointer(event.pageX, event.pageY));
 document.addEventListener("touchstart", (event) => {
   const touch = event.touches[0];
   if (touch) updatePointer(touch.pageX, touch.pageY, true);
 }, { passive: true });
 
-function pad2(number) {
-  return String(number).padStart(2, "0");
-}
-
+// ---- 時計(年月日時分秒+1/100秒) ----
 function updateClock() {
   const now = new Date();
-  pageClock.textContent =
-    `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}` +
-    `${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}` +
-    `${pad2(Math.floor(now.getMilliseconds() / 10))}`;
+  const parts = [
+    now.getMonth() + 1, now.getDate(),
+    now.getHours(), now.getMinutes(), now.getSeconds(),
+    Math.floor(now.getMilliseconds() / 10),
+  ];
+  pageClock.textContent = now.getFullYear() + parts.map((part) => pad(part, 2)).join("");
 }
 
 updateClock();
 setInterval(updateClock, 10);
 
-setTimeout(() => {
-  splash.style.display = "none";
-}, 2100);
-
-function pad(number) {
-  return String(number).padStart(3, "0");
-}
-
-function currentColumns() {
-  return window.matchMedia(MOBILE_QUERY).matches ? COLUMNS_MOBILE : COLUMNS_DESKTOP;
-}
-
+// ---- 一覧 ----
 function renderGridLines(columns, rows) {
   const gridLines = document.createElement("div");
   gridLines.className = "grid-lines";
@@ -89,49 +71,37 @@ function renderGridLines(columns, rows) {
 }
 
 function render() {
+  const columns = currentColumns();
   ledger.replaceChildren();
 
   WORKS.forEach((work, index) => {
     const entry = document.createElement("article");
     entry.className = "entry";
-    entry.addEventListener("click", () => openViewer(index));
+    entry.innerHTML = `
+      <div class="entry-rays" aria-hidden="true">
+        <span class="ray ray-tl"></span>
+        <span class="ray ray-tr"></span>
+        <span class="ray ray-bl"></span>
+        <span class="ray ray-br"></span>
+      </div>
+      <div class="entry-thumb"><img loading="lazy"></div>
+      ${work.title ? `<h2 class="entry-title">${work.title}</h2>` : ""}
+      <div class="entry-meta">
+        <span class="entry-index">${pad(index + 1, 3)}</span>
+        <span class="entry-location">${work.location}</span>
+        <span class="entry-year">${work.observed || ""}</span>
+      </div>
+    `;
 
-    const thumb = document.createElement("div");
-    thumb.className = "entry-thumb";
-
-    const image = document.createElement("img");
+    const image = entry.querySelector("img");
     image.src = work.image;
-    image.alt = work.title || work.location;
-    image.loading = "lazy";
-    thumb.appendChild(image);
+    image.alt = altText(work);
 
-    const title = document.createElement("h2");
-    title.className = "entry-title";
-    title.textContent = work.title;
-
-    const meta = document.createElement("div");
-    meta.className = "entry-meta";
-    meta.innerHTML = `
-      <span class="entry-index">${pad(index + 1)}</span>
-      <span class="entry-location">${work.location}</span>
-      <span class="entry-year">${work.observed || ""}</span>
-    `;
-
-    const rays = document.createElement("div");
-    rays.className = "entry-rays";
-    rays.setAttribute("aria-hidden", "true");
-    rays.innerHTML = `
-      <span class="ray ray-tl"></span>
-      <span class="ray ray-tr"></span>
-      <span class="ray ray-bl"></span>
-      <span class="ray ray-br"></span>
-    `;
-
-    entry.append(rays, thumb, title, meta);
+    entry.addEventListener("click", () => openViewer(index));
     ledger.appendChild(entry);
   });
 
-  const columns = currentColumns();
+  // 最後の行が埋まらない分は、空のマスで埋めて枠を完成させる
   const fillerCount = (columns - (WORKS.length % columns)) % columns;
   for (let i = 0; i < fillerCount; i++) {
     const filler = document.createElement("div");
@@ -143,45 +113,32 @@ function render() {
   ledger.appendChild(renderGridLines(columns, (WORKS.length + fillerCount) / columns));
 }
 
+// ---- 拡大表示 ----
+function setViewerOpen(isOpen) {
+  viewer.classList.toggle("is-open", isOpen);
+  viewer.setAttribute("aria-hidden", String(!isOpen));
+  document.body.style.overflow = isOpen ? "hidden" : "";
+}
+
 function openViewer(index) {
   const work = WORKS[index];
-
   viewerImage.src = work.image;
-  viewerImage.alt = work.title || work.location;
-  viewerIndex.textContent = pad(index + 1);
-  viewerTitle.textContent = work.title;
-  viewerRoad.textContent = work.road || "";
-  viewerLocation.textContent = work.location;
-  viewerObserved.textContent = work.observed || "";
-  viewerGenerated.textContent = work.generated || "";
-  viewerNote.textContent = work.note || "";
-
-  viewer.classList.add("is-open");
-  viewer.setAttribute("aria-hidden", "false");
-  document.body.style.overflow = "hidden";
+  viewerImage.alt = altText(work);
+  viewerIndex.textContent = pad(index + 1, 3);
+  viewerTitle.textContent = work.title || "";
+  viewerFields.forEach(([key, element]) => {
+    element.textContent = work[key] || "";
+  });
+  setViewerOpen(true);
 }
 
-function closeViewer() {
-  viewer.classList.remove("is-open");
-  viewer.setAttribute("aria-hidden", "true");
-  document.body.style.overflow = "";
-}
-
-viewerClose.addEventListener("click", closeViewer);
 viewer.addEventListener("click", (event) => {
-  if (event.target === viewer) closeViewer();
+  if (event.target === viewer || event.target.closest(".viewer-close")) setViewerOpen(false);
 });
+
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && viewer.classList.contains("is-open")) closeViewer();
+  if (event.key === "Escape") setViewerOpen(false);
 });
 
-let columns = currentColumns();
 render();
-
-window.addEventListener("resize", () => {
-  const nextColumns = currentColumns();
-  if (nextColumns !== columns) {
-    columns = nextColumns;
-    render();
-  }
-});
+mobileQuery.addEventListener("change", render);
