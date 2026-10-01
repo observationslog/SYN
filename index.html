@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -12,9 +12,11 @@
 </head>
 <body>
 
-<div id="splash" class="splash" aria-hidden="true">
-  <span class="splash-text">OBSERVATIONS</span>
+<div id="splash" class="splash">
+  <div class="splash-inner"><span class="splash-text">OBSERVATIONS</span></div>
 </div>
+
+<div class="tap-crosshair" id="tapCrosshair"></div>
 
 <main>
   <header class="page-header">
@@ -24,18 +26,22 @@
     </div>
     <div class="page-header-right">
       <span class="page-clock" id="pageClock"></span>
-      <span class="page-coords" id="pageCoords">0000 0000</span>
     </div>
   </header>
 
-  <div id="ledger" class="ledger"></div>
+  <div class="map-frame" id="mapFrame">
+    <img class="map-image" id="mapImage" alt="">
+    <div class="map-dots" id="mapDots"></div>
+    <div class="map-coords" id="mapCoords">
+      <span class="map-coords-hover" id="mapCoordsHover"></span>
+      <span class="map-coords-self" id="mapCoordsSelf">-- --</span>
+    </div>
+  </div>
 </main>
 
 <footer class="site-footer">
-  <a href="https://www.instagram.com/sightseeingcomputer/" target="_blank" rel="noopener">@sightseeingcomputer</a>
+  <p><a href="https://instagram.com/sightseeingcomputer" target="_blank" rel="noopener">@sightseeingcomputer</a></p>
 </footer>
-
-<div id="tapCrosshair" class="tap-crosshair" aria-hidden="true"></div>
 
 <div id="viewer" class="viewer" aria-hidden="true">
   <button class="viewer-close" aria-label="閉じる">×</button>
@@ -47,10 +53,10 @@
       <span class="viewer-index" id="viewer-index"></span>
       <h2 id="viewer-title"></h2>
       <dl class="viewer-fields">
-        <dt>ROAD</dt><dd id="viewer-road"></dd>
-        <dt>LOCATION</dt><dd id="viewer-location"></dd>
+        <dt>COORDS</dt><dd id="viewer-coords"></dd>
         <dt>OBSERVED</dt><dd id="viewer-observed"></dd>
         <dt>GENERATED</dt><dd id="viewer-generated"></dd>
+        <dt>ADDRESS</dt><dd id="viewer-address"></dd>
       </dl>
       <p id="viewer-note"></p>
     </div>

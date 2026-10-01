@@ -3,7 +3,6 @@
   --paper: #f1ede2;
   --line: rgba(241, 237, 226, 0.14);
   --font: "DotGothic16", monospace;
-  --flow: 0.1s;
 }
 
 * { box-sizing: border-box; }
@@ -15,11 +14,13 @@ body {
   font-family: var(--font);
   font-size: 16px;
   line-height: 1.7;
-  cursor: url("cursor.png") 16 16, crosshair;
+  cursor: crosshair;
 }
 
 a { color: inherit; text-decoration: none; }
 button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+
+/* ---------- splash ---------- */
 
 .splash {
   position: fixed;
@@ -46,8 +47,26 @@ button { border: 0; background: none; color: inherit; font: inherit; cursor: poi
   85% { transform: translate(-2px, -1px); }
 }
 
+/* ---------- tap crosshair(モバイルでタップ位置を示す) ---------- */
+
+.tap-crosshair {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  z-index: 50;
+  display: none;
+  transform: translate(-16px, -16px);
+  pointer-events: none;
+  background: url("cursor.png") center / contain no-repeat;
+  image-rendering: pixelated;
+}
+
+.tap-crosshair.is-visible { display: block; }
+
+/* ---------- header ---------- */
+
 main {
-  max-width: 2360px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 40px 56px 96px;
 }
@@ -66,164 +85,94 @@ main {
   gap: 8px;
 }
 
-.page-header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.page-coords,
 .page-clock { white-space: nowrap; }
 
-.ledger {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2px;
+/* ---------- map ---------- */
+
+.map-frame {
   position: relative;
-  overflow: clip; /* 斜線が枠の外へはみ出して横スクロールを出さない */
-}
-
-.grid-lines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.grid-line { position: absolute; }
-
-.grid-line.vertical {
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: repeating-linear-gradient(180deg, var(--paper) 0 4px, transparent 4px 8px);
-  animation: flow-v var(--flow) linear infinite;
-}
-
-.grid-line.horizontal {
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: repeating-linear-gradient(90deg, var(--paper) 0 4px, transparent 4px 8px);
-  animation: flow-h var(--flow) linear infinite;
-}
-
-/* 隣り合う線は逆向きに流れる */
-.grid-line.flip { animation-direction: reverse; }
-
-@keyframes flow-h { to { background-position: -8px 0; } }
-@keyframes flow-v { to { background-position: 0 -8px; } }
-
-.entry {
-  position: relative;
-  z-index: 1;
-  aspect-ratio: 1;
-  container-type: inline-size;
-  cursor: pointer;
-  pointer-events: none;
-}
-
-/* ホバー・クリックの反応範囲は、マス中央の60%四方だけ */
-.entry::after {
-  content: "";
-  position: absolute;
-  inset: 20%;
-  pointer-events: auto;
-}
-
-/* ホバー中の作品を最背面にして、斜線が他の作品の写真・文字の前に出ないようにする */
-.entry:hover { z-index: 0; }
-
-.entry-thumb {
-  position: absolute;
-  inset: 33.333%;
-  z-index: 3;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--line);
   overflow: hidden;
 }
 
-.entry-thumb img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-
-.entry-rays {
+.map-image {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
   pointer-events: none;
 }
 
-/* 斜線は低解像度のドット絵(ray.png)を拡大したもの。写真の角から隣の作品の写真の角まで届く */
-.ray {
+.map-image.is-visible { opacity: 1; }
+
+.map-dots {
   position: absolute;
-  width: 66.667%;
-  aspect-ratio: 1;
-  background: url("ray.png") center / 100% 100% no-repeat;
-  image-rendering: pixelated;
-  clip-path: inset(0 100% 100% 0);
-  transition: clip-path 0.25s ease-out;
+  inset: 0;
 }
 
-.ray-tl { left: -33.333%; top: -33.333%; }
-.ray-tr { left: 66.667%; top: -33.333%; transform: scaleX(-1); }
-.ray-bl { left: -33.333%; top: 66.667%; transform: scaleX(-1); clip-path: inset(100% 0 0 100%); }
-.ray-br { left: 66.667%; top: 66.667%; clip-path: inset(100% 0 0 100%); }
-
-@media (hover:hover) and (pointer:fine) {
-  .entry:hover .ray { clip-path: inset(0); }
-}
-
-.entry-title,
-.entry-meta {
+.map-dot {
   position: absolute;
-  right: 6%;
-  z-index: 4;
-  text-align: right;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.6);
+  width: 6px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  background: var(--paper);
+  cursor: pointer;
 }
 
-.entry-title {
-  top: 50%;
-  margin: 0;
-  transform: translateY(-50%);
-  font-size: 6.1cqw;
-  font-weight: 400;
+.map-dot.is-self {
+  cursor: default;
+  box-shadow: 0 0 0 4px rgba(241, 237, 226, 0.25);
 }
 
-.entry-meta {
-  bottom: 6%;
+.map-picker {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.map-picker-item {
+  width: 48px;
+  height: 48px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--line);
+}
+
+.map-coords {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
+  font-size: 14px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.6);
 }
 
-.entry-index,
-.entry-year { font-size: 4.3cqw; }
-.entry-location { font-size: 4.6cqw; }
+.map-coords-hover:empty { display: none; }
+
+/* ---------- footer ---------- */
 
 .site-footer {
-  max-width: 2360px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 28px 56px 56px;
   font-size: 13px;
 }
 
-.tap-crosshair {
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  z-index: 50;
-  display: none;
-  transform: translate(-16px, -16px);
-  pointer-events: none;
-  background: url("cursor.png") center / contain no-repeat;
-  image-rendering: pixelated;
-}
-
-.tap-crosshair.is-visible { display: block; }
+/* ---------- viewer (lightbox) ---------- */
 
 .viewer {
   position: fixed;
@@ -305,12 +254,11 @@ main {
   letter-spacing: 0.03em;
 }
 
+.viewer-fields dt { text-transform: uppercase; }
 .viewer-fields dd { margin: 0; }
 #viewer-note { max-width: 40ch; font-size: 14px; }
 
-@media (hover: none) and (pointer: coarse) {
-  body { cursor: default; }
-}
+/* ---------- responsive ---------- */
 
 @media (max-width: 720px) {
   .viewer-inner { grid-template-columns: 1fr; }
@@ -320,12 +268,14 @@ main {
 @media (max-width: 640px) {
   main { padding: 28px 20px 48px; }
   .page-header { margin-bottom: 20px; font-size: 14px; }
-  .ledger { grid-template-columns: repeat(3, 1fr); }
   .site-footer { padding: 14px 20px 40px; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  body { cursor: default; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
   .splash { display: none; }
-  .grid-line { animation: none; }
 }
