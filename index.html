@@ -30,11 +30,13 @@
   </header>
 
   <div class="map-frame" id="mapFrame">
-    <img class="map-image" id="mapImage" alt="">
-    <div class="map-dots" id="mapDots"></div>
+    <div class="map-layer" id="mapLayer">
+      <div class="map-dots" id="mapDots"></div>
+      <div class="gaze-line" id="gazeLine" hidden></div>
+    </div>
     <div class="map-coords" id="mapCoords">
-      <span class="map-coords-hover" id="mapCoordsHover"></span>
-      <span class="map-coords-self" id="mapCoordsSelf">-- --</span>
+      <span class="map-coords-last" id="mapCoordsLast"></span>
+      <span class="map-coords-self" id="mapCoordsSelf">--. --.</span>
     </div>
   </div>
 </main>
@@ -53,12 +55,13 @@
       <span class="viewer-index" id="viewer-index"></span>
       <h2 id="viewer-title"></h2>
       <dl class="viewer-fields">
-        <dt>COORDS</dt><dd id="viewer-coords"></dd>
         <dt>OBSERVED</dt><dd id="viewer-observed"></dd>
         <dt>GENERATED</dt><dd id="viewer-generated"></dd>
         <dt>ADDRESS</dt><dd id="viewer-address"></dd>
       </dl>
       <p id="viewer-note"></p>
+      <p class="viewer-extra" id="viewer-distance"></p>
+      <p class="viewer-extra" id="viewer-views" hidden></p>
     </div>
   </div>
 </div>

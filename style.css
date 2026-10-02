@@ -97,18 +97,13 @@ main {
   overflow: hidden;
 }
 
-.map-image {
+/* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる) */
+.map-layer {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  transition: opacity 0.2s ease-out;
-  pointer-events: none;
+  width: 60%;
+  height: 60%;
+  transition: transform 0.4s ease-out;
 }
-
-.map-image.is-visible { opacity: 1; }
 
 .map-dots {
   position: absolute;
@@ -125,9 +120,27 @@ main {
 }
 
 .map-dot.is-self {
-  cursor: default;
+  cursor: pointer;
   box-shadow: 0 0 0 4px rgba(241, 237, 226, 0.25);
 }
+
+.map-dot.is-sun {
+  background: #e0503a;
+  cursor: default;
+}
+
+.gaze-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1px;
+  background: var(--paper);
+  opacity: 0.5;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.gaze-line[hidden] { display: none; }
 
 .map-picker {
   position: absolute;
@@ -153,6 +166,7 @@ main {
   position: absolute;
   right: 16px;
   bottom: 16px;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -161,7 +175,7 @@ main {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.6);
 }
 
-.map-coords-hover:empty { display: none; }
+.map-coords-last:empty { display: none; }
 
 /* ---------- footer ---------- */
 
@@ -257,6 +271,8 @@ main {
 .viewer-fields dt { text-transform: uppercase; }
 .viewer-fields dd { margin: 0; }
 #viewer-note { max-width: 40ch; font-size: 14px; }
+.viewer-extra { margin: 4px 0 0; font-size: 12px; opacity: 0.7; }
+.viewer-extra[hidden] { display: none; }
 
 /* ---------- responsive ---------- */
 
