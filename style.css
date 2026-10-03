@@ -66,9 +66,9 @@ button { border: 0; background: none; color: inherit; font: inherit; cursor: poi
 /* ---------- header ---------- */
 
 main {
-  max-width: 1600px;
+  max-width: none;
   margin: 0 auto;
-  padding: 40px 56px 96px;
+  padding: 16px 16px 32px;
 }
 
 .page-header {
@@ -95,14 +95,14 @@ main {
   aspect-ratio: 2 / 1;
   border: 1px solid var(--line);
   overflow: hidden;
+  cursor: default;
 }
 
-/* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる) */
+/* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる)。移動はアニメーションせず、作品画面を閉じた時点で瞬時に新しい位置を反映する */
 .map-layer {
   position: absolute;
   width: 60%;
   height: 60%;
-  transition: transform 0.4s ease-out;
 }
 
 .map-dots {
@@ -129,29 +129,41 @@ main {
   cursor: default;
 }
 
+/* 現在地から短く伸びるだけの矢印(距離は表さず、方向だけ示す) */
 .gaze-line {
   position: absolute;
   top: 0;
   left: 0;
+  width: 22px;
   height: 1px;
   background: var(--paper);
-  opacity: 0.5;
   transform-origin: 0 0;
   pointer-events: none;
 }
 
+.gaze-line::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -3px;
+  border: 3px solid transparent;
+  border-left-color: var(--paper);
+}
+
 .gaze-line[hidden] { display: none; }
 
+/* 画面基準(地図の中に埋もれない)で中央に出す */
 .map-picker {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 5;
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  z-index: 150;
   display: flex;
   gap: 4px;
   padding: 4px;
   background: var(--ink);
   border: 1px solid var(--line);
+  transform: translateX(-50%);
 }
 
 .map-picker-item {
@@ -164,13 +176,14 @@ main {
 
 .map-coords {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
+  right: 0;
+  bottom: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
+  padding: 8px;
   font-size: 14px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.6);
 }
@@ -180,10 +193,16 @@ main {
 /* ---------- footer ---------- */
 
 .site-footer {
-  max-width: 1600px;
+  max-width: 2200px;
   margin: 0 auto;
-  padding: 28px 56px 56px;
-  font-size: 13px;
+  padding: 16px 24px;
+}
+
+.site-footer-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--paper);
 }
 
 /* ---------- viewer (lightbox) ---------- */
@@ -195,12 +214,12 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px;
+  padding: 24px;
   background: var(--ink);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.11s ease-out;
+  cursor: pointer;
 }
 
 .viewer.is-open {
@@ -210,69 +229,77 @@ main {
 }
 
 .viewer-inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.6fr);
-  gap: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
   width: 100%;
-  max-width: 1100px;
+  max-width: 640px;
   max-height: 100%;
-  transform: scale(0.96);
-  transition: transform 0.11s ease-out;
 }
 
-.viewer.is-open .viewer-inner { transform: scale(1); }
-
-.viewer-close {
-  position: absolute;
-  top: 20px;
-  right: 24px;
-  font-size: 28px;
-  line-height: 1;
+/* 開いた瞬間は真っ黒。中身は要素ごとに上から順番にフェードインする */
+.viewer-inner > * {
+  opacity: 0;
+  animation: viewer-item-in 0.25s ease-out forwards;
 }
 
+.viewer.is-open .viewer-image-wrap { animation-delay: 0s; }
+.viewer.is-open .viewer-meta > .viewer-index { animation-delay: 0.08s; }
+.viewer.is-open .viewer-meta > h2 { animation-delay: 0.14s; }
+.viewer.is-open .viewer-meta > .viewer-fields { animation-delay: 0.2s; }
+.viewer.is-open #viewer-note { animation-delay: 0.26s; }
+
+@keyframes viewer-item-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 正方形の固定サイズ。どの作品でも同じ大きさで、画像はその中に収まる最大サイズで表示 */
 .viewer-image-wrap {
+  flex: none;
+  width: 30vmin;
+  height: 30vmin;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 240px;
-  max-height: 78vh;
   overflow: hidden;
 }
 
 .viewer-image-wrap img {
   display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 78vh;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
-.viewer-meta { align-self: center; }
-.viewer-index { font-size: 13px; }
-
-.viewer-meta h2 {
-  margin: 8px 0 20px;
-  font-size: 26px;
-  font-weight: 400;
+.viewer-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: center;
 }
+
+.viewer-meta h2 { margin: 0; font-weight: 400; }
 
 .viewer-fields {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 6px 16px;
-  margin: 0 0 20px;
+  width: 100%;
+  max-width: 420px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
-  font-size: 12px;
-  letter-spacing: 0.03em;
+  text-align: left;
 }
 
 .viewer-fields dt { text-transform: uppercase; }
 .viewer-fields dd { margin: 0; }
-#viewer-note { max-width: 40ch; font-size: 14px; }
-.viewer-extra { margin: 4px 0 0; font-size: 12px; opacity: 0.7; }
-.viewer-extra[hidden] { display: none; }
+.viewer-fields dt[hidden],
+.viewer-fields dd[hidden] { display: none; }
+#viewer-note { max-width: 40ch; margin: 0; }
 
 /* ---------- responsive ---------- */
 

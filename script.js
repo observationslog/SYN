@@ -16,7 +16,9 @@ const viewerTitle = document.getElementById("viewer-title");
 const viewerFields = ["observed", "generated", "address", "note"]
   .map((key) => [key, document.getElementById(`viewer-${key}`)]);
 const viewerDistance = document.getElementById("viewer-distance");
+const viewerDistanceLabel = document.getElementById("viewer-distance-label");
 const viewerViews = document.getElementById("viewer-views");
+const viewerViewsLabel = document.getElementById("viewer-views-label");
 
 const pad = (value, length) => String(value).padStart(length, "0");
 const altText = (work) => work.title || work.address;
@@ -53,6 +55,7 @@ setInterval(updateClock, 10);
 // ---- タップ位置の照準表示(モバイル)。作品画面が開いている間は更新しない ----
 document.addEventListener("touchstart", (event) => {
   if (viewer.classList.contains("is-open")) return;
+  if (event.target.closest("#mapFrame")) return; // マップ上のタップは照準を動かさない
   const touch = event.touches[0];
   if (!touch) return;
   tapCrosshair.style.left = `${touch.pageX}px`;
@@ -110,7 +113,7 @@ function updateGazeLine() {
 
 // ---- 右下の座標表示(最後に見た点 / 1/8の確率で閲覧ログ表示) ----
 function updateCoordsPanel() {
-  mapCoordsSelf.textContent = selfCoords ? formatCoords(selfCoords) : "--. --.";
+  mapCoordsSelf.textContent = selfCoords ? `YOU ${formatCoords(selfCoords)}` : "YOU --. --.";
   if (!lastViewed) {
     mapCoordsLast.textContent = "";
     return;
@@ -274,20 +277,24 @@ function openViewer(index) {
   });
 
   if (selfCoords && work.coords) {
-    viewerDistance.textContent = `DISTANCE FOR YOU ${Math.round(distanceKm(selfCoords, work.coords))}km`;
+    viewerDistance.textContent = `${Math.round(distanceKm(selfCoords, work.coords))}km`;
     viewerDistance.hidden = false;
+    viewerDistanceLabel.hidden = false;
   } else {
     viewerDistance.hidden = true;
+    viewerDistanceLabel.hidden = true;
   }
 
   const key = viewCountKey(work);
   const count = Number(localStorage.getItem(key) || "0") + 1;
   localStorage.setItem(key, String(count));
   if (count >= 2) {
-    viewerViews.textContent = `YOU VIEWED ${count}`;
+    viewerViews.textContent = String(count);
     viewerViews.hidden = false;
+    viewerViewsLabel.hidden = false;
   } else {
     viewerViews.hidden = true;
+    viewerViewsLabel.hidden = true;
   }
 
   viewStartedAt = Date.now();
@@ -306,9 +313,7 @@ function closeViewer() {
   setViewerOpen(false);
 }
 
-viewer.addEventListener("click", (event) => {
-  if (event.target === viewer || event.target.closest(".viewer-close")) closeViewer();
-});
+viewer.addEventListener("click", () => closeViewer());
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeViewer();

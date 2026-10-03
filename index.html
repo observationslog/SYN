@@ -42,11 +42,10 @@
 </main>
 
 <footer class="site-footer">
-  <p><a href="https://instagram.com/sightseeingcomputer" target="_blank" rel="noopener">@sightseeingcomputer</a></p>
+  <a class="site-footer-dot" href="https://instagram.com/sightseeingcomputer" target="_blank" rel="noopener" aria-label="@sightseeingcomputer"></a>
 </footer>
 
 <div id="viewer" class="viewer" aria-hidden="true">
-  <button class="viewer-close" aria-label="閉じる">×</button>
   <div class="viewer-inner">
     <div class="viewer-image-wrap">
       <img id="viewer-image" src="" alt="">
@@ -58,10 +57,10 @@
         <dt>OBSERVED</dt><dd id="viewer-observed"></dd>
         <dt>GENERATED</dt><dd id="viewer-generated"></dd>
         <dt>ADDRESS</dt><dd id="viewer-address"></dd>
+        <dt id="viewer-distance-label">DISTANCE</dt><dd id="viewer-distance"></dd>
+        <dt id="viewer-views-label">VIEWS</dt><dd id="viewer-views"></dd>
       </dl>
       <p id="viewer-note"></p>
-      <p class="viewer-extra" id="viewer-distance"></p>
-      <p class="viewer-extra" id="viewer-views" hidden></p>
     </div>
   </div>
 </div>
