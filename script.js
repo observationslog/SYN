@@ -1,6 +1,8 @@
 const splash = document.getElementById("splash");
 const tapCrosshair = document.getElementById("tapCrosshair");
-const pageClock = document.getElementById("pageClock");
+const statusClock = document.getElementById("statusClock");
+const statusWeather = document.getElementById("statusWeather");
+const statusCountry = document.getElementById("statusCountry");
 
 const mapFrame = document.getElementById("mapFrame");
 const mapLayer = document.getElementById("mapLayer");
@@ -46,11 +48,38 @@ function updateClock() {
     now.getHours(), now.getMinutes(), now.getSeconds(),
     Math.floor(now.getMilliseconds() / 10),
   ];
-  pageClock.textContent = now.getFullYear() + parts.map((part) => pad(part, 2)).join("");
+  statusClock.textContent = now.getFullYear() + parts.map((part) => pad(part, 2)).join("");
 }
 
 updateClock();
 setInterval(updateClock, 10);
+
+// ---- 天気・現在の国(サイト右下)。現在地が取れてから取得する ----
+const WEATHER_WORDS = {
+  0: "CLEAR", 1: "CLEAR", 2: "CLOUDY", 3: "CLOUDY",
+  45: "FOGGY", 48: "FOGGY",
+  51: "RAINY", 53: "RAINY", 55: "RAINY", 56: "RAINY", 57: "RAINY",
+  61: "RAINY", 63: "RAINY", 65: "RAINY", 66: "RAINY", 67: "RAINY",
+  71: "SNOWY", 73: "SNOWY", 75: "SNOWY", 77: "SNOWY",
+  80: "RAINY", 81: "RAINY", 82: "RAINY",
+  85: "SNOWY", 86: "SNOWY",
+  95: "STORMY", 96: "STORMY", 99: "STORMY",
+};
+
+async function updateSiteStatus([lat, lon]) {
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+    const data = await res.json();
+    const code = data.current_weather && data.current_weather.weathercode;
+    statusWeather.textContent = WEATHER_WORDS[code] || "";
+  } catch (e) { statusWeather.textContent = ""; }
+
+  try {
+    const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+    const data = await res.json();
+    statusCountry.textContent = data.countryName ? `STATE ${data.countryName.toUpperCase()}` : "";
+  } catch (e) { statusCountry.textContent = ""; }
+}
 
 // ---- タップ位置の照準表示(モバイル)。作品画面が開いている間は更新しない ----
 document.addEventListener("touchstart", (event) => {
@@ -100,13 +129,10 @@ function updateGazeLine() {
   }
   const from = layerPixelOf(selfCoords);
   const to = layerPixelOf(lastViewed.coords);
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const length = Math.hypot(dx, dy);
-  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const angle = (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
+  // 長さは固定(style.css の .gaze-line width)。現在地から短く伸びるだけの矢印にする
   gazeLine.style.left = `${from.x}px`;
   gazeLine.style.top = `${from.y}px`;
-  gazeLine.style.width = `${length}px`;
   gazeLine.style.transform = `rotate(${angle}deg)`;
   gazeLine.hidden = false;
 }
@@ -173,14 +199,17 @@ function addDot({ coords, className = "", onClick }) {
 }
 
 function closePicker() {
-  const open = mapDots.querySelector(".map-picker");
+  const open = mapFrame.querySelector(".map-picker");
   if (open) open.remove();
 }
 
+// 長方形(マップ)の中に収まる位置に表示する。マップ自体に重ねるので埋もれない
 function openPicker(dot, indices) {
   closePicker();
   const picker = document.createElement("div");
   picker.className = "map-picker";
+  const box = document.createElement("div");
+  box.className = "map-picker-box";
   indices.forEach((index) => {
     const work = WORKS[index];
     const thumb = document.createElement("button");
@@ -192,9 +221,10 @@ function openPicker(dot, indices) {
       closePicker();
       openViewer(index);
     });
-    picker.appendChild(thumb);
+    box.appendChild(thumb);
   });
-  dot.appendChild(picker);
+  picker.appendChild(box);
+  mapFrame.appendChild(picker);
 }
 
 document.addEventListener("click", (event) => {
@@ -220,6 +250,9 @@ groupByProximity(WORKS.map((_, index) => index).filter((index) => WORKS[index].c
 
 addDot({ coords: subsolarPoint(), className: "is-sun" });
 
+// 位置情報が取れない/応答が無い場合でも表示が止まったままにならないよう、先に初期状態を出しておく
+updateCoordsPanel();
+
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
@@ -237,11 +270,11 @@ if (navigator.geolocation) {
       recenterMap(selfCoords);
       updateCoordsPanel();
       updateGazeLine();
+      updateSiteStatus(selfCoords);
     },
     () => { updateCoordsPanel(); },
+    { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 },
   );
-} else {
-  updateCoordsPanel();
 }
 
 // ---- 拡大表示 ----
