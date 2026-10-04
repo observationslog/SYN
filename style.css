@@ -37,20 +37,15 @@ button { border: 0; background: none; color: inherit; font: inherit; cursor: poi
   animation: splash-jitter 2.1s steps(1) 1;
 }
 
+/* ブラウン管の表示ブレのように、0.3秒ごとに少しだけズレる(明滅はしない) */
 @keyframes splash-jitter {
-  0% { transform: translate(0, 0); opacity: 1; }
-  8% { transform: translate(8px, -4px); opacity: 0.4; }
-  16% { transform: translate(-10px, 3px); opacity: 1; }
-  24% { transform: translate(6px, 6px); opacity: 0.6; }
-  32% { transform: translate(-4px, -7px); opacity: 1; }
-  40% { transform: translate(9px, 1px); opacity: 0.3; }
-  48% { transform: translate(-7px, -3px); opacity: 1; }
-  56% { transform: translate(3px, 7px); opacity: 0.7; }
-  64% { transform: translate(-9px, 2px); opacity: 1; }
-  72% { transform: translate(5px, -5px); opacity: 0.5; }
-  80% { transform: translate(-3px, 4px); opacity: 1; }
-  88% { transform: translate(2px, -2px); opacity: 0.8; }
-  100% { transform: translate(0, 0); opacity: 1; }
+  0%, 100% { transform: translate(0, 0); }
+  14.3% { transform: translate(3px, -2px); }
+  28.6% { transform: translate(-4px, 1px); }
+  42.9% { transform: translate(2px, 3px); }
+  57.1% { transform: translate(-3px, -3px); }
+  71.4% { transform: translate(4px, 1px); }
+  85.7% { transform: translate(-2px, -1px); }
 }
 
 /* ---------- tap crosshair(モバイルでタップ位置を示す) ---------- */
@@ -99,7 +94,8 @@ main {
   aspect-ratio: 2 / 1;
   border: 1px solid var(--line);
   overflow: hidden;
-  cursor: url("cursor.png") 16 16, crosshair;
+  /* 画像ファイルに依存しないよう、照準(コーナーブラケット+中央の点)をSVGで直接指定する */
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M2 2 L2 9 M2 2 L9 2" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><path d="M30 2 L30 9 M30 2 L23 2" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><path d="M2 30 L2 23 M2 30 L9 30" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><path d="M30 30 L30 23 M30 30 L23 30" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><circle cx="16" cy="16" r="1.5" fill="%23f1ede2"/></svg>') 16 16, crosshair;
 }
 
 /* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる)。移動はアニメーションせず、作品画面を閉じた時点で瞬時に新しい位置を反映する */
@@ -203,6 +199,9 @@ main {
   max-width: 2200px;
   margin: 0 auto;
   padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .site-footer-dot {
@@ -212,20 +211,15 @@ main {
   background: var(--paper);
 }
 
-/* ---------- site status(サイト右下固定。天気・国・時計) ---------- */
+/* ---------- site status(インスタのリンクと同じ行。ページの一部として表示) ---------- */
 
 .site-status {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 60;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
   font-size: 14px;
   letter-spacing: 0.05em;
-  pointer-events: none;
 }
 
 .site-status span:empty { display: none; }

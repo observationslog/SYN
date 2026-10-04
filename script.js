@@ -56,7 +56,7 @@ setInterval(updateClock, 10);
 
 // ---- 天気・現在の国(サイト右下)。現在地が取れてから取得する ----
 const WEATHER_WORDS = {
-  0: "CLEAR", 1: "CLEAR", 2: "CLOUDY", 3: "CLOUDY",
+  0: "SUNNY", 1: "SUNNY", 2: "CLOUDY", 3: "CLOUDY",
   45: "FOGGY", 48: "FOGGY",
   51: "RAINY", 53: "RAINY", 55: "RAINY", 56: "RAINY", 57: "RAINY",
   61: "RAINY", 63: "RAINY", 65: "RAINY", 66: "RAINY", 67: "RAINY",
