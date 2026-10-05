@@ -63,6 +63,11 @@ button { border: 0; background: none; color: inherit; font: inherit; cursor: poi
 
 .tap-crosshair.is-visible { display: block; }
 
+/* 長方形(ストリート/ミニマップ)内をタップした時だけ照準に切り替える */
+.tap-crosshair.is-aim {
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="%23f1ede2" stroke-width="1.5"/><line x1="16" y1="1" x2="16" y2="7" stroke="%23f1ede2" stroke-width="1.5"/><line x1="16" y1="25" x2="16" y2="31" stroke="%23f1ede2" stroke-width="1.5"/><line x1="1" y1="16" x2="7" y2="16" stroke="%23f1ede2" stroke-width="1.5"/><line x1="25" y1="16" x2="31" y2="16" stroke="%23f1ede2" stroke-width="1.5"/></svg>') center / contain no-repeat;
+}
+
 /* ---------- header ---------- */
 
 main {
@@ -90,44 +95,62 @@ main {
   aspect-ratio: 2 / 1;
   border: 1px solid var(--line);
   overflow: hidden;
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="%23f1ede2" stroke-width="1.5"/><line x1="16" y1="1" x2="16" y2="7" stroke="%23f1ede2" stroke-width="1.5"/><line x1="16" y1="25" x2="16" y2="31" stroke="%23f1ede2" stroke-width="1.5"/><line x1="1" y1="16" x2="7" y2="16" stroke="%23f1ede2" stroke-width="1.5"/><line x1="25" y1="16" x2="31" y2="16" stroke="%23f1ede2" stroke-width="1.5"/></svg>') 16 16, crosshair;
 }
 
+/* 上段:作品プレビュー / 下段:矢印(選択肢)。枠を分割するのではなく、ひと続きの長方形の中で上下に配置するだけ */
 .street-preview {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64%;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4%;
+}
+
+.street-cluster-item {
+  flex: none;
+  object-fit: contain;
+  display: block;
   cursor: pointer;
 }
 
-.street-preview img {
-  width: 34vmin;
-  height: 34vmin;
-  object-fit: contain;
-  display: block;
-  pointer-events: none; /* クリックは .street-preview 側で受ける */
-}
-
+/* 近い座標の作品は1つの場所としてまとめ、横並びで表示する。サイズはJS側で枚数と枠の大きさから計算する */
 .street-arrows {
   position: absolute;
-  inset: 0;
-  pointer-events: none; /* 矢印(ボタン)以外は素通りさせる */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
 }
 
-/* Street Viewの矢印を参考にした、縦に潰れた遠近感のある矢印 */
+/* 地面に出ているストリートビューの矢印を参考に、常に薄く縦に潰れた見た目を保つ(回転はさせない)。
+   位置関係(方位)は左右どちらに並べるか・左右どちらへ傾けるかだけに使う */
 .street-arrow {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 28px;
-  height: 14px;
-  pointer-events: auto;
-  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="14" viewBox="0 0 28 14"><polygon points="0,14 14,0 28,14 21,14 14,7 7,14" fill="%23f1ede2"/></svg>') center / contain no-repeat;
+  flex: none;
+  width: 34px;
+  height: 9px;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="34" height="9" viewBox="0 0 34 9"><polygon points="0,9 17,0 34,9 27,9 17,3.5 7,9" fill="%23f1ede2"/></svg>') center / contain no-repeat;
+}
+
+.street-arrow--left {
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="34" height="9" viewBox="0 0 34 9"><polygon points="0,9 11,0 34,9 24,9 11,3.5 5,9" fill="%23f1ede2"/></svg>') center / contain no-repeat;
+}
+
+.street-arrow--right {
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="34" height="9" viewBox="0 0 34 9"><polygon points="0,9 10,9 23,3.5 23,9 34,9 23,0" fill="%23f1ede2"/></svg>') center / contain no-repeat;
 }
 
 /* ---------- minimap(縮小表示専用。タップ・クリックには反応しない) ---------- */
 
+/* クリックハンドラは一切付けていないので反応しないが、カーソル表示(照準)のためpointer-eventsは通常のままにする */
 .minimap-frame {
   position: relative;
   width: 42%;
@@ -135,7 +158,7 @@ main {
   aspect-ratio: 2 / 1;
   border: 1px solid var(--line);
   overflow: hidden;
-  pointer-events: none;
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="%23f1ede2" stroke-width="1.5"/><line x1="16" y1="1" x2="16" y2="7" stroke="%23f1ede2" stroke-width="1.5"/><line x1="16" y1="25" x2="16" y2="31" stroke="%23f1ede2" stroke-width="1.5"/><line x1="1" y1="16" x2="7" y2="16" stroke="%23f1ede2" stroke-width="1.5"/><line x1="25" y1="16" x2="31" y2="16" stroke="%23f1ede2" stroke-width="1.5"/></svg>') 16 16, crosshair;
 }
 
 /* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる)。移動はアニメーションせず、瞬時に新しい位置を反映する */
@@ -189,17 +212,19 @@ main {
 
 .gaze-line[hidden] { display: none; }
 
+/* 地図(ミニマップ)に被らないよう、サイト左端に固定して左揃えで表示する */
 .map-coords {
-  position: absolute;
-  right: 0;
-  bottom: 0;
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 4px;
   padding: 8px;
   font-size: 14px;
+  text-align: left;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.6);
 }
 

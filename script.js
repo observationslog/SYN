@@ -13,7 +13,6 @@ const mapCoordsSelf = document.getElementById("mapCoordsSelf");
 
 const streetFrame = document.getElementById("streetFrame");
 const streetPreview = document.getElementById("streetPreview");
-const streetImage = document.getElementById("streetImage");
 const streetArrows = document.getElementById("streetArrows");
 
 const viewer = document.getElementById("viewer");
@@ -108,6 +107,7 @@ async function updateSiteStatus([lat, lon]) {
 }
 
 // ---- タップ位置の照準表示(モバイル)。作品画面が開いている間/矢印をタップした時は更新しない ----
+// 長方形(ストリート/ミニマップ)の中をタップしている間だけ照準、外では十字
 document.addEventListener("touchstart", (event) => {
   if (viewer.classList.contains("is-open")) return;
   if (event.target.closest(".street-arrow")) return;
@@ -116,6 +116,8 @@ document.addEventListener("touchstart", (event) => {
   tapCrosshair.style.left = `${touch.pageX}px`;
   tapCrosshair.style.top = `${touch.pageY}px`;
   tapCrosshair.classList.add("is-visible");
+  const insideFrame = Boolean(event.target.closest(".street-frame, .minimap-frame"));
+  tapCrosshair.classList.toggle("is-aim", insideFrame);
 }, { passive: true });
 
 // 地図本体(.map-layer)のサイズ。style.css の .map-layer と同じ値にしておく
@@ -223,21 +225,69 @@ if (navigator.geolocation) {
 }
 
 // ---- ストリート風ナビゲーション ----
-// 近い(この距離以内の)作品があれば矢印でつなぐ。無ければ全体で最も近い1件につなぐ
+// 座標が近い作品同士は1つの「場所」としてまとめ、横並びで表示する(今後増える作品にも適用される汎用の仕組み)
+const STREET_CLUSTER_KM = 50;
+
+function buildStreetClusters() {
+  const parent = {};
+  streetIndices.forEach((i) => { parent[i] = i; });
+  function find(i) {
+    while (parent[i] !== i) i = parent[i];
+    return i;
+  }
+  function union(a, b) {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  }
+
+  streetIndices.forEach((i) => {
+    streetIndices.forEach((j) => {
+      if (i < j && distanceKm(WORKS[i].coords, WORKS[j].coords) <= STREET_CLUSTER_KM) {
+        union(i, j);
+      }
+    });
+  });
+
+  // 数値キーのオブジェクトは昇順に並び替わってしまうため、Mapで出現順(=WORKS配列の順)を保つ
+  const clusters = [];
+  const clusterByRoot = new Map();
+  streetIndices.forEach((i) => {
+    const root = find(i);
+    if (!clusterByRoot.has(root)) {
+      const cluster = { memberIndices: [], coords: null };
+      clusterByRoot.set(root, cluster);
+      clusters.push(cluster);
+    }
+    clusterByRoot.get(root).memberIndices.push(i);
+  });
+
+  clusters.forEach((cluster) => {
+    const lat = cluster.memberIndices.reduce((sum, i) => sum + WORKS[i].coords[0], 0) / cluster.memberIndices.length;
+    const lon = cluster.memberIndices.reduce((sum, i) => sum + WORKS[i].coords[1], 0) / cluster.memberIndices.length;
+    cluster.coords = [lat, lon];
+  });
+
+  return clusters;
+}
+
+const streetClusters = buildStreetClusters();
+
+// 近い(この距離以内の)場所があれば矢印でつなぐ。無ければ全体で最も近い1件につなぐ
 const STREET_NEARBY_KM = 500;
 
-function nearbyIndicesOf(index) {
-  const base = WORKS[index].coords;
-  const near = streetIndices.filter(
-    (i) => i !== index && distanceKm(base, WORKS[i].coords) <= STREET_NEARBY_KM,
-  );
+function nearbyClustersOf(clusterIndex) {
+  const base = streetClusters[clusterIndex].coords;
+  const near = streetClusters
+    .map((_, i) => i)
+    .filter((i) => i !== clusterIndex && distanceKm(base, streetClusters[i].coords) <= STREET_NEARBY_KM);
   if (near.length > 0) return near;
 
   let nearest = null;
   let nearestDist = Infinity;
-  streetIndices.forEach((i) => {
-    if (i === index) return;
-    const d = distanceKm(base, WORKS[i].coords);
+  streetClusters.forEach((cluster, i) => {
+    if (i === clusterIndex) return;
+    const d = distanceKm(base, cluster.coords);
     if (d < nearestDist) {
       nearestDist = d;
       nearest = i;
@@ -246,75 +296,71 @@ function nearbyIndicesOf(index) {
   return nearest === null ? [] : [nearest];
 }
 
-// 方角が近すぎる矢印同士は重なってクリックできなくなるため、最低限の角度差を強制して振り分ける
-const STREET_ARROW_MIN_GAP_DEG = 20;
+let currentClusterIndex = null;
 
-function spreadBearings(bearings, minGapDeg) {
-  const n = bearings.length;
-  if (n < 2) return bearings.slice();
-  const order = bearings.map((_, i) => i).sort((a, b) => bearings[a] - bearings[b]);
-  const sorted = order.map((i) => bearings[i]);
-  for (let pass = 0; pass < n; pass += 1) {
-    for (let k = 0; k < n; k += 1) {
-      const nextIdx = (k + 1) % n;
-      let gap = sorted[nextIdx] - sorted[k];
-      if (nextIdx === 0) gap += 360;
-      if (gap < minGapDeg) {
-        sorted[nextIdx] += minGapDeg - gap;
-      }
-    }
-  }
-  const normalized = sorted.map((b) => ((b % 360) + 360) % 360);
-  const result = new Array(n);
-  order.forEach((originalIndex, k) => {
-    result[originalIndex] = normalized[k];
+function showStreetCluster(clusterIndex) {
+  currentClusterIndex = clusterIndex;
+  const cluster = streetClusters[clusterIndex];
+
+  // 場所にまとまった作品を横並びで表示。それぞれ個別にタップでフルスクリーン表示を開く
+  streetPreview.innerHTML = "";
+  const frameWidth = streetFrame.clientWidth;
+  const frameHeight = streetFrame.clientHeight;
+  const count = cluster.memberIndices.length;
+  const itemSize = Math.min(
+    Math.min(frameWidth, frameHeight) * 0.34,
+    (frameWidth * 0.86) / count - 8,
+  );
+  cluster.memberIndices.forEach((workIndex) => {
+    const work = WORKS[workIndex];
+    const img = document.createElement("img");
+    img.className = "street-cluster-item";
+    img.src = work.image;
+    img.alt = altText(work);
+    img.style.width = `${itemSize}px`;
+    img.style.height = `${itemSize}px`;
+    img.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openViewer(workIndex);
+    });
+    streetPreview.appendChild(img);
   });
-  return result;
-}
 
-let currentStreetIndex = null;
-
-function showStreetWork(index) {
-  currentStreetIndex = index;
-  const work = WORKS[index];
-  streetImage.src = work.image;
-  streetImage.alt = altText(work);
-
+  // 矢印は地面の帯(下段)に並べる選択肢。方位(位置関係)は左右どちら寄りに置くか・
+  // 左右どちらへ傾けるかの判断だけに使い、見た目は常に同じ薄い縦潰れ形を保つ(回転はしない)
   streetArrows.innerHTML = "";
-  const radius = Math.min(streetFrame.clientWidth, streetFrame.clientHeight) * 0.38;
-  const targets = nearbyIndicesOf(index);
-  const bearings = targets.map((targetIndex) => bearingTo(work.coords, WORKS[targetIndex].coords));
-  const spread = spreadBearings(bearings, STREET_ARROW_MIN_GAP_DEG);
-  targets.forEach((targetIndex, i) => {
-    const bearing = spread[i];
+  const targets = nearbyClustersOf(clusterIndex);
+  const targetsWithBearing = targets
+    .map((targetIndex) => ({ targetIndex, bearing: bearingTo(cluster.coords, streetClusters[targetIndex].coords) }))
+    .sort((a, b) => a.bearing - b.bearing);
+
+  targetsWithBearing.forEach(({ targetIndex, bearing }, i) => {
+    const targetWork = WORKS[streetClusters[targetIndex].memberIndices[0]];
     const arrow = document.createElement("button");
-    arrow.className = "street-arrow";
-    arrow.setAttribute("aria-label", altText(WORKS[targetIndex]));
-    arrow.style.transform = `translate(-50%, -50%) rotate(${bearing}deg) translateY(-${radius}px)`;
+    const mid = (targetsWithBearing.length - 1) / 2;
+    const lean = i < mid ? "left" : i > mid ? "right" : "";
+    arrow.className = lean ? `street-arrow street-arrow--${lean}` : "street-arrow";
+    arrow.setAttribute("aria-label", altText(targetWork));
     arrow.addEventListener("click", (event) => {
       event.stopPropagation();
-      showStreetWork(targetIndex);
+      showStreetCluster(targetIndex);
     });
     streetArrows.appendChild(arrow);
   });
 
-  // 到着した場所として、視線・ミニマップ・右下表示を更新する
-  lastViewed = { coords: work.coords, work, durationMs: 0 };
-  recenterMap(work.coords);
+  // 到着した場所として、視線・ミニマップ・右下表示を更新する(場所の代表作品はまとまりの先頭)
+  lastViewed = { coords: cluster.coords, work: WORKS[cluster.memberIndices[0]], durationMs: 0 };
+  recenterMap(cluster.coords);
   updateGazeLine();
   updateCoordsPanel();
 }
 
-streetPreview.addEventListener("click", () => {
-  if (currentStreetIndex !== null) openViewer(currentStreetIndex);
-});
-
-if (streetIndices.length > 0) showStreetWork(streetIndices[0]);
+if (streetClusters.length > 0) showStreetCluster(0);
 
 window.addEventListener("resize", () => {
   recenterMap(lastViewed ? lastViewed.coords : selfCoords || [0, 0]);
   updateGazeLine();
-  if (currentStreetIndex !== null) showStreetWork(currentStreetIndex);
+  if (currentClusterIndex !== null) showStreetCluster(currentClusterIndex);
 });
 
 // ---- 拡大表示 ----
