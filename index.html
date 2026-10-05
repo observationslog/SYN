@@ -13,7 +13,7 @@
 <body>
 
 <div id="splash" class="splash">
-  <div class="splash-inner"><span class="splash-text">OBSERVATIONS</span></div>
+  <span class="splash-text">OBSERVATIONS</span>
 </div>
 
 <div class="tap-crosshair" id="tapCrosshair"></div>
@@ -26,7 +26,14 @@
     </div>
   </header>
 
-  <div class="map-frame" id="mapFrame">
+  <div class="street-frame" id="streetFrame">
+    <div class="street-preview" id="streetPreview">
+      <img id="streetImage" src="" alt="">
+    </div>
+    <div class="street-arrows" id="streetArrows"></div>
+  </div>
+
+  <div class="minimap-frame" id="minimapFrame">
     <div class="map-layer" id="mapLayer">
       <div class="map-dots" id="mapDots"></div>
       <div class="gaze-line" id="gazeLine" hidden></div>
@@ -62,7 +69,6 @@
         <dt id="viewer-distance-label">DISTANCE</dt><dd id="viewer-distance"></dd>
         <dt id="viewer-views-label">YOU VIEWED</dt><dd id="viewer-views"></dd>
       </dl>
-      <p id="viewer-note"></p>
     </div>
   </div>
 </div>

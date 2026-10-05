@@ -4,18 +4,23 @@ const statusClock = document.getElementById("statusClock");
 const statusWeather = document.getElementById("statusWeather");
 const statusCountry = document.getElementById("statusCountry");
 
-const mapFrame = document.getElementById("mapFrame");
+const minimapFrame = document.getElementById("minimapFrame");
 const mapLayer = document.getElementById("mapLayer");
 const mapDots = document.getElementById("mapDots");
 const gazeLine = document.getElementById("gazeLine");
 const mapCoordsLast = document.getElementById("mapCoordsLast");
 const mapCoordsSelf = document.getElementById("mapCoordsSelf");
 
+const streetFrame = document.getElementById("streetFrame");
+const streetPreview = document.getElementById("streetPreview");
+const streetImage = document.getElementById("streetImage");
+const streetArrows = document.getElementById("streetArrows");
+
 const viewer = document.getElementById("viewer");
 const viewerImage = document.getElementById("viewer-image");
 const viewerIndex = document.getElementById("viewer-index");
 const viewerTitle = document.getElementById("viewer-title");
-const viewerFields = ["observed", "generated", "address", "note"]
+const viewerFields = ["observed", "generated", "address"]
   .map((key) => [key, document.getElementById(`viewer-${key}`)]);
 const viewerDistance = document.getElementById("viewer-distance");
 const viewerDistanceLabel = document.getElementById("viewer-distance-label");
@@ -32,6 +37,27 @@ const positionOf = ([lat, lon]) => ({
   left: `${((lon + 180) / 360) * 100}%`,
   top: `${((90 - lat) / 180) * 100}%`,
 });
+
+function distanceKm(a, b) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+// 地点aから見た地点bの方位(度、北=0、時計回り)
+function bearingTo(a, b) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
 
 let selfCoords = null;
 let lastViewed = null; // { coords, work, durationMs }
@@ -81,10 +107,10 @@ async function updateSiteStatus([lat, lon]) {
   } catch (e) { statusCountry.textContent = ""; }
 }
 
-// ---- タップ位置の照準表示(モバイル)。作品画面が開いている間は更新しない ----
+// ---- タップ位置の照準表示(モバイル)。作品画面が開いている間/矢印をタップした時は更新しない ----
 document.addEventListener("touchstart", (event) => {
   if (viewer.classList.contains("is-open")) return;
-  if (event.target.closest("#mapFrame")) return; // マップ上のタップは照準を動かさない
+  if (event.target.closest(".street-arrow")) return;
   const touch = event.touches[0];
   if (!touch) return;
   tapCrosshair.style.left = `${touch.pageX}px`;
@@ -95,12 +121,12 @@ document.addEventListener("touchstart", (event) => {
 // 地図本体(.map-layer)のサイズ。style.css の .map-layer と同じ値にしておく
 const LAYER_SCALE = 0.6;
 
-// ---- 地図の中心を合わせる ----
+// ---- ミニマップの中心を合わせる ----
 // 地図本体は枠より小さく作ってあるので、世界地図そのものが枠からはみ出すことはない。
 // 中心にしたい点は、その余白の範囲内でできるだけ中央へ寄せる(平行移動のみ、拡大縮小はしない)。
 function recenterMap(coords) {
-  const frameWidth = mapFrame.clientWidth;
-  const frameHeight = mapFrame.clientHeight;
+  const frameWidth = minimapFrame.clientWidth;
+  const frameHeight = minimapFrame.clientHeight;
   const layerWidth = frameWidth * LAYER_SCALE;
   const layerHeight = frameHeight * LAYER_SCALE;
   const marginX = frameWidth - layerWidth;
@@ -116,8 +142,8 @@ function recenterMap(coords) {
 function layerPixelOf(coords) {
   const { left, top } = positionOf(coords);
   return {
-    x: (parseFloat(left) / 100) * (mapFrame.clientWidth * LAYER_SCALE),
-    y: (parseFloat(top) / 100) * (mapFrame.clientHeight * LAYER_SCALE),
+    x: (parseFloat(left) / 100) * (minimapFrame.clientWidth * LAYER_SCALE),
+    y: (parseFloat(top) / 100) * (minimapFrame.clientHeight * LAYER_SCALE),
   };
 }
 
@@ -153,11 +179,6 @@ function updateCoordsPanel() {
   }
 }
 
-window.addEventListener("resize", () => {
-  recenterMap(lastViewed ? lastViewed.coords : selfCoords || [0, 0]);
-  updateGazeLine();
-});
-
 // ---- 太陽直下点(ページを開いた時点のみ計算。簡易計算) ----
 function subsolarPoint() {
   const now = new Date();
@@ -169,85 +190,18 @@ function subsolarPoint() {
   return [declination, longitude];
 }
 
-// ---- 地図上の点 ----
-// 近い座標(同じ都市内など)は1つの点に統合する。この度数以内なら同じ点とみなす
-const CLUSTER_THRESHOLD_DEG = 3;
-
-function groupByProximity(indices) {
-  const clusters = [];
-  indices.forEach((index) => {
-    const [lat, lon] = WORKS[index].coords;
-    const cluster = clusters.find(
-      (c) => Math.hypot(c.lat - lat, c.lon - lon) < CLUSTER_THRESHOLD_DEG,
-    );
-    if (cluster) {
-      cluster.indices.push(index);
-    } else {
-      clusters.push({ lat, lon, indices: [index] });
-    }
-  });
-  return clusters;
-}
-
-function addDot({ coords, className = "", onClick }) {
+// ---- ミニマップの点(表示専用。クリック・タップには反応しない) ----
+function addDot({ coords, className = "" }) {
   const dot = document.createElement("span");
   dot.className = `map-dot ${className}`.trim();
   Object.assign(dot.style, positionOf(coords));
-  if (onClick) dot.addEventListener("click", onClick);
   mapDots.appendChild(dot);
   return dot;
 }
 
-function closePicker() {
-  const open = mapFrame.querySelector(".map-picker");
-  if (open) open.remove();
-}
+const streetIndices = WORKS.map((_, index) => index).filter((index) => WORKS[index].coords);
 
-// 長方形(マップ)の中に収まる位置に表示する。マップ自体に重ねるので埋もれない
-function openPicker(dot, indices) {
-  closePicker();
-  const picker = document.createElement("div");
-  picker.className = "map-picker";
-  const box = document.createElement("div");
-  box.className = "map-picker-box";
-  indices.forEach((index) => {
-    const work = WORKS[index];
-    const thumb = document.createElement("button");
-    thumb.className = "map-picker-item";
-    thumb.style.backgroundImage = `url("${work.image}")`;
-    thumb.setAttribute("aria-label", altText(work));
-    thumb.addEventListener("click", (event) => {
-      event.stopPropagation();
-      closePicker();
-      openViewer(index);
-    });
-    box.appendChild(thumb);
-  });
-  picker.appendChild(box);
-  mapFrame.appendChild(picker);
-}
-
-document.addEventListener("click", (event) => {
-  if (!event.target.closest(".map-dot")) closePicker();
-});
-
-groupByProximity(WORKS.map((_, index) => index).filter((index) => WORKS[index].coords)).forEach(
-  ({ lat, lon, indices }) => {
-    if (indices.length === 1) {
-      addDot({
-        coords: WORKS[indices[0]].coords,
-        onClick: () => openViewer(indices[0]),
-      });
-      return;
-    }
-    const dot = addDot({ coords: [lat, lon] });
-    dot.addEventListener("click", (event) => {
-      event.stopPropagation();
-      openPicker(dot, indices);
-    });
-  },
-);
-
+streetIndices.forEach((index) => addDot({ coords: WORKS[index].coords }));
 addDot({ coords: subsolarPoint(), className: "is-sun" });
 
 // 位置情報が取れない/応答が無い場合でも表示が止まったままにならないよう、先に初期状態を出しておく
@@ -257,16 +211,7 @@ if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
       selfCoords = [coords.latitude, coords.longitude];
-      addDot({
-        coords: selfCoords,
-        className: "is-self",
-        onClick: () => {
-          lastViewed = null;
-          recenterMap(selfCoords);
-          updateGazeLine();
-          updateCoordsPanel();
-        },
-      });
+      addDot({ coords: selfCoords, className: "is-self" });
       recenterMap(selfCoords);
       updateCoordsPanel();
       updateGazeLine();
@@ -277,6 +222,101 @@ if (navigator.geolocation) {
   );
 }
 
+// ---- ストリート風ナビゲーション ----
+// 近い(この距離以内の)作品があれば矢印でつなぐ。無ければ全体で最も近い1件につなぐ
+const STREET_NEARBY_KM = 500;
+
+function nearbyIndicesOf(index) {
+  const base = WORKS[index].coords;
+  const near = streetIndices.filter(
+    (i) => i !== index && distanceKm(base, WORKS[i].coords) <= STREET_NEARBY_KM,
+  );
+  if (near.length > 0) return near;
+
+  let nearest = null;
+  let nearestDist = Infinity;
+  streetIndices.forEach((i) => {
+    if (i === index) return;
+    const d = distanceKm(base, WORKS[i].coords);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearest = i;
+    }
+  });
+  return nearest === null ? [] : [nearest];
+}
+
+// 方角が近すぎる矢印同士は重なってクリックできなくなるため、最低限の角度差を強制して振り分ける
+const STREET_ARROW_MIN_GAP_DEG = 20;
+
+function spreadBearings(bearings, minGapDeg) {
+  const n = bearings.length;
+  if (n < 2) return bearings.slice();
+  const order = bearings.map((_, i) => i).sort((a, b) => bearings[a] - bearings[b]);
+  const sorted = order.map((i) => bearings[i]);
+  for (let pass = 0; pass < n; pass += 1) {
+    for (let k = 0; k < n; k += 1) {
+      const nextIdx = (k + 1) % n;
+      let gap = sorted[nextIdx] - sorted[k];
+      if (nextIdx === 0) gap += 360;
+      if (gap < minGapDeg) {
+        sorted[nextIdx] += minGapDeg - gap;
+      }
+    }
+  }
+  const normalized = sorted.map((b) => ((b % 360) + 360) % 360);
+  const result = new Array(n);
+  order.forEach((originalIndex, k) => {
+    result[originalIndex] = normalized[k];
+  });
+  return result;
+}
+
+let currentStreetIndex = null;
+
+function showStreetWork(index) {
+  currentStreetIndex = index;
+  const work = WORKS[index];
+  streetImage.src = work.image;
+  streetImage.alt = altText(work);
+
+  streetArrows.innerHTML = "";
+  const radius = Math.min(streetFrame.clientWidth, streetFrame.clientHeight) * 0.38;
+  const targets = nearbyIndicesOf(index);
+  const bearings = targets.map((targetIndex) => bearingTo(work.coords, WORKS[targetIndex].coords));
+  const spread = spreadBearings(bearings, STREET_ARROW_MIN_GAP_DEG);
+  targets.forEach((targetIndex, i) => {
+    const bearing = spread[i];
+    const arrow = document.createElement("button");
+    arrow.className = "street-arrow";
+    arrow.setAttribute("aria-label", altText(WORKS[targetIndex]));
+    arrow.style.transform = `translate(-50%, -50%) rotate(${bearing}deg) translateY(-${radius}px)`;
+    arrow.addEventListener("click", (event) => {
+      event.stopPropagation();
+      showStreetWork(targetIndex);
+    });
+    streetArrows.appendChild(arrow);
+  });
+
+  // 到着した場所として、視線・ミニマップ・右下表示を更新する
+  lastViewed = { coords: work.coords, work, durationMs: 0 };
+  recenterMap(work.coords);
+  updateGazeLine();
+  updateCoordsPanel();
+}
+
+streetPreview.addEventListener("click", () => {
+  if (currentStreetIndex !== null) openViewer(currentStreetIndex);
+});
+
+if (streetIndices.length > 0) showStreetWork(streetIndices[0]);
+
+window.addEventListener("resize", () => {
+  recenterMap(lastViewed ? lastViewed.coords : selfCoords || [0, 0]);
+  updateGazeLine();
+  if (currentStreetIndex !== null) showStreetWork(currentStreetIndex);
+});
+
 // ---- 拡大表示 ----
 function setViewerOpen(isOpen) {
   viewer.classList.toggle("is-open", isOpen);
@@ -286,16 +326,6 @@ function setViewerOpen(isOpen) {
 
 function viewCountKey(work) {
   return `syn_views_${filenameOf(work)}`;
-}
-
-function distanceKm(a, b) {
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const R = 6371;
-  const dLat = toRad(b[0] - a[0]);
-  const dLon = toRad(b[1] - a[1]);
-  const x = Math.sin(dLat / 2) ** 2
-    + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
 function openViewer(index) {

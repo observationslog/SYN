@@ -58,8 +58,7 @@ button { border: 0; background: none; color: inherit; font: inherit; cursor: poi
   display: none;
   transform: translate(-16px, -16px);
   pointer-events: none;
-  background: url("cursor.png") center / contain no-repeat;
-  image-rendering: pixelated;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><line x1="16" y1="2" x2="16" y2="30" stroke="%23f1ede2" stroke-width="1.5"/><line x1="2" y1="16" x2="30" y2="16" stroke="%23f1ede2" stroke-width="1.5"/></svg>') center / contain no-repeat;
 }
 
 .tap-crosshair.is-visible { display: block; }
@@ -73,9 +72,6 @@ main {
 }
 
 .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   margin-bottom: 32px;
   letter-spacing: 0.05em;
 }
@@ -86,19 +82,63 @@ main {
   gap: 8px;
 }
 
-/* ---------- map ---------- */
+/* ---------- street(ストリートビュー風のメイン表示) ---------- */
 
-.map-frame {
+.street-frame {
   position: relative;
   width: 100%;
   aspect-ratio: 2 / 1;
   border: 1px solid var(--line);
   overflow: hidden;
-  /* 画像ファイルに依存しないよう、照準(コーナーブラケット+中央の点)をSVGで直接指定する */
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M2 2 L2 9 M2 2 L9 2" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><path d="M30 2 L30 9 M30 2 L23 2" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><path d="M2 30 L2 23 M2 30 L9 30" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><path d="M30 30 L30 23 M30 30 L23 30" stroke="%23f1ede2" stroke-width="1.5" fill="none"/><circle cx="16" cy="16" r="1.5" fill="%23f1ede2"/></svg>') 16 16, crosshair;
 }
 
-/* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる)。移動はアニメーションせず、作品画面を閉じた時点で瞬時に新しい位置を反映する */
+.street-preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.street-preview img {
+  width: 34vmin;
+  height: 34vmin;
+  object-fit: contain;
+  display: block;
+  pointer-events: none; /* クリックは .street-preview 側で受ける */
+}
+
+.street-arrows {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* 矢印(ボタン)以外は素通りさせる */
+}
+
+/* Street Viewの矢印を参考にした、縦に潰れた遠近感のある矢印 */
+.street-arrow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 14px;
+  pointer-events: auto;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="14" viewBox="0 0 28 14"><polygon points="0,14 14,0 28,14 21,14 14,7 7,14" fill="%23f1ede2"/></svg>') center / contain no-repeat;
+}
+
+/* ---------- minimap(縮小表示専用。タップ・クリックには反応しない) ---------- */
+
+.minimap-frame {
+  position: relative;
+  width: 42%;
+  margin: 16px 0 0 auto;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる)。移動はアニメーションせず、瞬時に新しい位置を反映する */
 .map-layer {
   position: absolute;
   width: 60%;
@@ -148,34 +188,6 @@ main {
 }
 
 .gaze-line[hidden] { display: none; }
-
-/* 長方形(マップ)の中に重ねて表示する。常にその内側に収まるので埋もれない */
-.map-picker {
-  position: absolute;
-  inset: 0;
-  z-index: 150;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.map-picker-box {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--ink);
-  border: 1px solid var(--line);
-  pointer-events: auto;
-}
-
-.map-picker-item {
-  width: 48px;
-  height: 48px;
-  background-size: cover;
-  background-position: center;
-  border: 1px solid var(--line);
-}
 
 .map-coords {
   position: absolute;
@@ -267,7 +279,6 @@ main {
 .viewer.is-open .viewer-meta > .viewer-index { animation-delay: 0.08s; }
 .viewer.is-open .viewer-meta > h2 { animation-delay: 0.14s; }
 .viewer.is-open .viewer-meta > .viewer-fields { animation-delay: 0.2s; }
-.viewer.is-open #viewer-note { animation-delay: 0.26s; }
 
 @keyframes viewer-item-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -318,7 +329,6 @@ main {
 .viewer-fields dd { margin: 0; }
 .viewer-fields dt[hidden],
 .viewer-fields dd[hidden] { display: none; }
-#viewer-note { max-width: 40ch; margin: 0; }
 
 /* ---------- responsive ---------- */
 
@@ -331,6 +341,7 @@ main {
   main { padding: 28px 20px 48px; }
   .page-header { margin-bottom: 20px; font-size: 14px; }
   .site-footer { padding: 14px 20px 40px; }
+  .minimap-frame { width: 56%; }
 }
 
 @media (hover: none) and (pointer: coarse) {

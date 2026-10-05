@@ -8,7 +8,6 @@
   address    拡大表示のADDRESSに出る文字列(番地・都市など)
   observed   拡大表示のOBSERVEDに出る日付(ストリートビューが撮影された日付)
   generated  拡大表示のGENERATEDに出る日付(CGを作った日付)
-  note       任意の一言。空文字でも可
 */
 
 const WORKS = [
