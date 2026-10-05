@@ -150,11 +150,20 @@ main {
 
 /* ---------- minimap(縮小表示専用。タップ・クリックには反応しない) ---------- */
 
+/* 座標テキストはマップの左側に、通常のページ内の要素として並べる(固定UIっぽくしない) */
+.minimap-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 16px;
+}
+
 /* クリックハンドラは一切付けていないので反応しないが、カーソル表示(照準)のためpointer-eventsは通常のままにする */
 .minimap-frame {
   position: relative;
-  width: 42%;
-  margin: 16px 0 0 auto;
+  width: 38%;
+  flex: none;
   aspect-ratio: 2 / 1;
   border: 1px solid var(--line);
   overflow: hidden;
@@ -212,12 +221,8 @@ main {
 
 .gaze-line[hidden] { display: none; }
 
-/* 地図(ミニマップ)に被らないよう、サイト左端に固定して左揃えで表示する */
+/* マップに被らないよう、マップの左側にページ内の要素として表示する(fixedのUI的な浮き表示にはしない) */
 .map-coords {
-  position: fixed;
-  left: 16px;
-  bottom: 16px;
-  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -366,7 +371,9 @@ main {
   main { padding: 28px 20px 48px; }
   .page-header { margin-bottom: 20px; font-size: 14px; }
   .site-footer { padding: 14px 20px 40px; }
-  .minimap-frame { width: 56%; }
+  .minimap-frame { width: 52%; }
+  .minimap-row { align-items: flex-start; }
+  .map-coords { font-size: 12px; }
 }
 
 @media (hover: none) and (pointer: coarse) {

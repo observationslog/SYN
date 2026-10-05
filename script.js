@@ -273,27 +273,57 @@ function buildStreetClusters() {
 
 const streetClusters = buildStreetClusters();
 
-// 近い(この距離以内の)場所があれば矢印でつなぐ。無ければ全体で最も近い1件につなぐ
+// 近い(この距離以内の)場所は相互に矢印でつなぐ。それだけだと「自分の最寄り1件」にしか
+// 矢印が出ず、相手側からの矢印が無いと一方通行になって迷子になる(例:NYの最寄りがエルサルバドル
+// でも、エルサルバドルの最寄りがメキシコだと、エルサルバドルからNYへ戻れない)。
+// そのため全体を最小スパニングツリーで繋ぎ、どこからでも全ての場所へ辿り着けるようにする。
 const STREET_NEARBY_KM = 500;
 
-function nearbyClustersOf(clusterIndex) {
-  const base = streetClusters[clusterIndex].coords;
-  const near = streetClusters
-    .map((_, i) => i)
-    .filter((i) => i !== clusterIndex && distanceKm(base, streetClusters[i].coords) <= STREET_NEARBY_KM);
-  if (near.length > 0) return near;
+function buildStreetAdjacency() {
+  const n = streetClusters.length;
+  const adjacency = Array.from({ length: n }, () => new Set());
+  const connect = (a, b) => {
+    adjacency[a].add(b);
+    adjacency[b].add(a);
+  };
 
-  let nearest = null;
-  let nearestDist = Infinity;
-  streetClusters.forEach((cluster, i) => {
-    if (i === clusterIndex) return;
-    const d = distanceKm(base, cluster.coords);
-    if (d < nearestDist) {
-      nearestDist = d;
-      nearest = i;
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      if (distanceKm(streetClusters[i].coords, streetClusters[j].coords) <= STREET_NEARBY_KM) {
+        connect(i, j);
+      }
     }
-  });
-  return nearest === null ? [] : [nearest];
+  }
+
+  // 最小スパニングツリー(Prim法)で全体の接続を保証する
+  if (n > 1) {
+    const inTree = new Array(n).fill(false);
+    inTree[0] = true;
+    let count = 1;
+    while (count < n) {
+      let best = null;
+      for (let i = 0; i < n; i += 1) {
+        if (!inTree[i]) continue;
+        for (let j = 0; j < n; j += 1) {
+          if (inTree[j]) continue;
+          const d = distanceKm(streetClusters[i].coords, streetClusters[j].coords);
+          if (!best || d < best.d) best = { i, j, d };
+        }
+      }
+      if (!best) break;
+      connect(best.i, best.j);
+      inTree[best.j] = true;
+      count += 1;
+    }
+  }
+
+  return adjacency;
+}
+
+const streetAdjacency = buildStreetAdjacency();
+
+function nearbyClustersOf(clusterIndex) {
+  return Array.from(streetAdjacency[clusterIndex]);
 }
 
 let currentClusterIndex = null;
