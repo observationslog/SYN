@@ -37,8 +37,9 @@ const positionOf = ([lat, lon]) => ({
   top: `${((90 - lat) / 180) * 100}%`,
 });
 
+const toRad = (deg) => (deg * Math.PI) / 180;
+
 function distanceKm(a, b) {
-  const toRad = (deg) => (deg * Math.PI) / 180;
   const R = 6371;
   const dLat = toRad(b[0] - a[0]);
   const dLon = toRad(b[1] - a[1]);
@@ -49,7 +50,6 @@ function distanceKm(a, b) {
 
 // 地点aから見た地点bの方位(度、北=0、時計回り)
 function bearingTo(a, b) {
-  const toRad = (deg) => (deg * Math.PI) / 180;
   const lat1 = toRad(a[0]);
   const lat2 = toRad(b[0]);
   const dLon = toRad(b[1] - a[1]);
@@ -106,18 +106,15 @@ async function updateSiteStatus([lat, lon]) {
   } catch (e) { statusCountry.textContent = ""; }
 }
 
-// ---- タップ位置の照準表示(モバイル)。作品画面が開いている間/矢印をタップした時は更新しない ----
-// 長方形(ストリート/ミニマップ)の中をタップしている間だけ照準、外では十字
+// ---- タップ位置の十字表示(モバイル)。作品画面が開いている間/矢印をタップした時は更新しない ----
 document.addEventListener("touchstart", (event) => {
   if (viewer.classList.contains("is-open")) return;
-  if (event.target.closest(".street-arrow")) return;
+  if (event.target.closest(".compass-arrow")) return;
   const touch = event.touches[0];
   if (!touch) return;
   tapCrosshair.style.left = `${touch.pageX}px`;
   tapCrosshair.style.top = `${touch.pageY}px`;
   tapCrosshair.classList.add("is-visible");
-  const insideFrame = Boolean(event.target.closest(".street-frame, .minimap-frame"));
-  tapCrosshair.classList.toggle("is-aim", insideFrame);
 }, { passive: true });
 
 // 地図本体(.map-layer)のサイズ。style.css の .map-layer と同じ値にしておく
@@ -181,17 +178,6 @@ function updateCoordsPanel() {
   }
 }
 
-// ---- 太陽直下点(ページを開いた時点のみ計算。簡易計算) ----
-function subsolarPoint() {
-  const now = new Date();
-  const start = Date.UTC(now.getUTCFullYear(), 0, 0);
-  const dayOfYear = Math.floor((now - start) / 86400000);
-  const declination = 23.44 * Math.sin(((360 / 365) * (dayOfYear - 81) * Math.PI) / 180);
-  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60;
-  const longitude = ((12 - utcHours) * 15 + 540) % 360 - 180;
-  return [declination, longitude];
-}
-
 // ---- ミニマップの点(表示専用。クリック・タップには反応しない) ----
 function addDot({ coords, className = "" }) {
   const dot = document.createElement("span");
@@ -204,7 +190,14 @@ function addDot({ coords, className = "" }) {
 const streetIndices = WORKS.map((_, index) => index).filter((index) => WORKS[index].coords);
 
 streetIndices.forEach((index) => addDot({ coords: WORKS[index].coords }));
-addDot({ coords: subsolarPoint(), className: "is-sun" });
+
+// いま見ている場所の赤い点。lastViewed が変わるたびに位置を更新する
+let viewDot = null;
+function updateViewDot() {
+  if (!lastViewed) return;
+  if (!viewDot) viewDot = addDot({ coords: lastViewed.coords, className: "is-view" });
+  Object.assign(viewDot.style, positionOf(lastViewed.coords));
+}
 
 // 位置情報が取れない/応答が無い場合でも表示が止まったままにならないよう、先に初期状態を出しておく
 updateCoordsPanel();
@@ -328,6 +321,108 @@ function nearbyClustersOf(clusterIndex) {
 
 let currentClusterIndex = null;
 
+// ---- コンパス(選択肢の矢印) ----
+// 矢印は線で描いた山形。中心の周りの三重の楕円(内・中・外)に、目的地の正確な方位で置く(北が上)。
+// 方位が近くて重なる矢印だけ、距離の近い順に内→中→外へ並べる(何kmかは関係なく順位のみ)。
+// 重ならない矢印は一番内側。4つ以上重なった分は外側に置く。輪の線そのものは描かない。
+const COMPASS_RINGS = 3;
+const COMPASS_OVERLAP_DEG = 25; // この角度以内の矢印同士は「重なる」とみなす
+const COMPASS_FLATTEN = 0.5; // 楕円の縦横比(地面に置いたように縦に潰す)
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function assignCompassRings(items) {
+  const parent = items.map((_, i) => i);
+  const find = (i) => {
+    while (parent[i] !== i) i = parent[i];
+    return i;
+  };
+  for (let i = 0; i < items.length; i += 1) {
+    for (let j = i + 1; j < items.length; j += 1) {
+      const diff = Math.abs(items[i].bearing - items[j].bearing);
+      if (Math.min(diff, 360 - diff) <= COMPASS_OVERLAP_DEG) parent[find(i)] = find(j);
+    }
+  }
+  const groups = new Map();
+  items.forEach((item, i) => {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(item);
+  });
+  groups.forEach((group) => {
+    group.sort((a, b) => a.distance - b.distance);
+    group.forEach((item, rank) => { item.ring = Math.min(rank, COMPASS_RINGS - 1); });
+  });
+}
+
+function drawCompass(items) {
+  streetArrows.innerHTML = "";
+  if (items.length === 0) return;
+  assignCompassRings(items);
+
+  const width = streetArrows.clientWidth;
+  const height = streetArrows.clientHeight;
+  const cx = width / 2;
+  const cy = height / 2;
+  const flatten = COMPASS_FLATTEN;
+  // 矢印を置く位置だけを縦に潰した楕円にする。矢印そのものの形は歪ませず、方位の角度どおりに向ける。
+  // 外側の輪が下段の帯に収まる大きさにする
+  const outerRadius = Math.min((height * 0.42) / flatten, width * 0.45);
+  const half = Math.min(10, Math.max(5, height * 0.09)); // 山形の半分の長さ
+  const wing = half * 0.85; // 山形の開き(半幅)
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "compass");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+  items.forEach(({ targetIndex, bearing, ring }) => {
+    const theta = toRad(bearing);
+    const dx = Math.sin(theta); // 進行方向(北=上、時計回り)
+    const dy = -Math.cos(theta);
+    const px = Math.cos(theta); // 進行方向に直交する向き
+    const py = Math.sin(theta);
+    const radius = (outerRadius * (ring + 1)) / COMPASS_RINGS;
+    const hx = cx + dx * radius;
+    const hy = cy + dy * radius * flatten;
+
+    const apex = [hx + dx * half, hy + dy * half];
+    const wingA = [hx - dx * half * 0.6 + px * wing, hy - dy * half * 0.6 + py * wing];
+    const wingB = [hx - dx * half * 0.6 - px * wing, hy - dy * half * 0.6 - py * wing];
+
+    const targetWork = WORKS[streetClusters[targetIndex].memberIndices[0]];
+    const group = document.createElementNS(SVG_NS, "g");
+    group.setAttribute("class", "compass-arrow");
+    group.setAttribute("role", "button");
+    group.setAttribute("tabindex", "0");
+    group.setAttribute("aria-label", altText(targetWork));
+
+    const hit = document.createElementNS(SVG_NS, "circle");
+    hit.setAttribute("class", "compass-arrow-hit");
+    hit.setAttribute("cx", hx);
+    hit.setAttribute("cy", hy);
+    hit.setAttribute("r", Math.max(14, half * 1.4));
+
+    const line = document.createElementNS(SVG_NS, "polyline");
+    line.setAttribute("class", "compass-arrow-line");
+    line.setAttribute("points", [wingA, apex, wingB].map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "));
+
+    group.append(hit, line);
+    const go = (event) => {
+      event.stopPropagation();
+      showStreetCluster(targetIndex);
+    };
+    group.addEventListener("click", go);
+    group.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        go(event);
+      }
+    });
+    svg.appendChild(group);
+  });
+
+  streetArrows.appendChild(svg);
+}
+
 function showStreetCluster(clusterIndex) {
   currentClusterIndex = clusterIndex;
   const cluster = streetClusters[clusterIndex];
@@ -356,30 +451,17 @@ function showStreetCluster(clusterIndex) {
     streetPreview.appendChild(img);
   });
 
-  // 矢印は地面の帯(下段)に並べる選択肢。方位(位置関係)は左右どちら寄りに置くか・
-  // 左右どちらへ傾けるかの判断だけに使い、見た目は常に同じ薄い縦潰れ形を保つ(回転はしない)
-  streetArrows.innerHTML = "";
-  const targets = nearbyClustersOf(clusterIndex);
-  const targetsWithBearing = targets
-    .map((targetIndex) => ({ targetIndex, bearing: bearingTo(cluster.coords, streetClusters[targetIndex].coords) }))
-    .sort((a, b) => a.bearing - b.bearing);
-
-  targetsWithBearing.forEach(({ targetIndex, bearing }, i) => {
-    const targetWork = WORKS[streetClusters[targetIndex].memberIndices[0]];
-    const arrow = document.createElement("button");
-    const mid = (targetsWithBearing.length - 1) / 2;
-    const lean = i < mid ? "left" : i > mid ? "right" : "";
-    arrow.className = lean ? `street-arrow street-arrow--${lean}` : "street-arrow";
-    arrow.setAttribute("aria-label", altText(targetWork));
-    arrow.addEventListener("click", (event) => {
-      event.stopPropagation();
-      showStreetCluster(targetIndex);
-    });
-    streetArrows.appendChild(arrow);
-  });
+  // 矢印は下段に、現在の場所から見た目的地の方位に描く(北が上)。詳細は drawCompass
+  const targets = nearbyClustersOf(clusterIndex).map((targetIndex) => ({
+    targetIndex,
+    bearing: bearingTo(cluster.coords, streetClusters[targetIndex].coords),
+    distance: distanceKm(cluster.coords, streetClusters[targetIndex].coords),
+  }));
+  drawCompass(targets);
 
   // 到着した場所として、視線・ミニマップ・右下表示を更新する(場所の代表作品はまとまりの先頭)
   lastViewed = { coords: cluster.coords, work: WORKS[cluster.memberIndices[0]], durationMs: 0 };
+  updateViewDot();
   recenterMap(cluster.coords);
   updateGazeLine();
   updateCoordsPanel();
@@ -443,6 +525,7 @@ function openViewer(index) {
 function closeViewer() {
   if (viewer.classList.contains("is-open") && viewStartedAt && viewingWork && viewingWork.coords) {
     lastViewed = { coords: viewingWork.coords, work: viewingWork, durationMs: Date.now() - viewStartedAt };
+    updateViewDot();
     recenterMap(lastViewed.coords);
     updateGazeLine();
     updateCoordsPanel();
