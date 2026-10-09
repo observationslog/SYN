@@ -48,14 +48,10 @@ function distanceKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
-// 地点aから見た地点bの方位(度、北=0、時計回り)
+// 地点aから見た地点bの方位(度、北=0、時計回り)。ミニマップ(平らな地図)の上での方向。
+// 経度の差は素直に引き算するだけで、右端から左端へは回り込まない
 function bearingTo(a, b) {
-  const lat1 = toRad(a[0]);
-  const lat2 = toRad(b[0]);
-  const dLon = toRad(b[1] - a[1]);
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  return ((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI + 360) % 360;
 }
 
 let selfCoords = null;
@@ -326,8 +322,10 @@ let currentClusterIndex = null;
 // 方位が近くて重なる矢印だけ、距離の近い順に内→中→外へ並べる(何kmかは関係なく順位のみ)。
 // 重ならない矢印は一番内側。4つ以上重なった分は外側に置く。輪の線そのものは描かない。
 const COMPASS_RINGS = 3;
-const COMPASS_OVERLAP_DEG = 25; // この角度以内の矢印同士は「重なる」とみなす
-const COMPASS_FLATTEN = 0.5; // 楕円の縦横比(地面に置いたように縦に潰す)
+const COMPASS_RING_FRACTIONS = [0.4, 0.7, 1]; // 内・中・外の輪の半径(外側を1とした比)
+const COMPASS_OVERLAP_DEG = 40; // この角度以内の矢印同士は「重なる」とみなす
+const COMPASS_FLATTEN = 0.6; // 地面を縦に潰す割合
+const COMPASS_DEPTH = 0.3; // 遠近の強さ。大きいほど奥(北)が小さく、手前(南)が大きくなる
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function assignCompassRings(items) {
@@ -361,14 +359,27 @@ function drawCompass(items) {
 
   const width = streetArrows.clientWidth;
   const height = streetArrows.clientHeight;
-  const cx = width / 2;
-  const cy = height / 2;
   const flatten = COMPASS_FLATTEN;
-  // 矢印を置く位置だけを縦に潰した楕円にする。矢印そのものの形は歪ませず、方位の角度どおりに向ける。
-  // 外側の輪が下段の帯に収まる大きさにする
-  const outerRadius = Math.min((height * 0.42) / flatten, width * 0.45);
-  const half = Math.min(10, Math.max(5, height * 0.09)); // 山形の半分の長さ
-  const wing = half * 0.85; // 山形の開き(半幅)
+  const depth = COMPASS_DEPTH;
+  const half = Math.min(16, Math.max(8, height * 0.14)); // 山形の半分の長さ(地面上の長さ。手前ほど大きく見える)
+  const wing = half * 0.95; // 山形の開き(半幅)
+  const pad = half * 0.8;
+
+  // 地面(東=u、北=z)を斜めから見たように投影する。奥(北)ほど小さく、手前(南)ほど大きい。
+  // 山形は地面の上で描いてから投影し、線の太さは一定(CSS)のまま。
+  // 外側の輪(半径R)の南北の端がちょうど帯に収まるようにRと中心を決める
+  const scaleAt = (z) => 1 / (1 + depth * z);
+  const north = flatten * scaleAt(1);
+  const south = flatten * scaleAt(-1);
+  const outerRadius = Math.min((height - pad * 2) / (north + south), width * 0.42);
+  const cx = width / 2;
+  const cy = pad + north * outerRadius;
+  // 帯が縦に狭いと輪の間隔が詰まって矢印が重なるので、横方向の位置だけ広げる(帯の幅に収まる範囲で最大2倍)
+  const spreadX = Math.max(1, Math.min(2, (width * 0.42) / outerRadius));
+  const project = (u, z) => {
+    const s = 1 / (1 + (depth * z) / outerRadius);
+    return [cx + u * s, cy - flatten * z * s];
+  };
 
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", "compass");
@@ -376,17 +387,18 @@ function drawCompass(items) {
 
   items.forEach(({ targetIndex, bearing, ring }) => {
     const theta = toRad(bearing);
-    const dx = Math.sin(theta); // 進行方向(北=上、時計回り)
-    const dy = -Math.cos(theta);
-    const px = Math.cos(theta); // 進行方向に直交する向き
-    const py = Math.sin(theta);
-    const radius = (outerRadius * (ring + 1)) / COMPASS_RINGS;
-    const hx = cx + dx * radius;
-    const hy = cy + dy * radius * flatten;
+    const du = Math.sin(theta); // 進行方向(地面上。北=z、東=u)
+    const dz = Math.cos(theta);
+    const pu = Math.cos(theta); // 進行方向に直交する向き
+    const pz = -Math.sin(theta);
+    const radius = outerRadius * COMPASS_RING_FRACTIONS[ring];
+    const mu = du * radius * spreadX; // 置く位置だけ横に広げる(山形の形は広げない)
+    const mz = dz * radius;
 
-    const apex = [hx + dx * half, hy + dy * half];
-    const wingA = [hx - dx * half * 0.6 + px * wing, hy - dy * half * 0.6 + py * wing];
-    const wingB = [hx - dx * half * 0.6 - px * wing, hy - dy * half * 0.6 - py * wing];
+    const apex = project(mu + du * half, mz + dz * half);
+    const wingA = project(mu - du * half * 0.6 + pu * wing, mz - dz * half * 0.6 + pz * wing);
+    const wingB = project(mu - du * half * 0.6 - pu * wing, mz - dz * half * 0.6 - pz * wing);
+    const [hx, hy] = project(mu, mz);
 
     const targetWork = WORKS[streetClusters[targetIndex].memberIndices[0]];
     const group = document.createElementNS(SVG_NS, "g");

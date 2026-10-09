@@ -1,0 +1,398 @@
+:root {
+  --ink: #0a0c10;
+  --paper: #f1ede2;
+  --line: rgba(241, 237, 226, 0.14);
+  --font: "DotGothic16", monospace;
+}
+
+/* カーソルは常にただの十字に統一する */
+* { box-sizing: border-box; cursor: crosshair; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+a { color: inherit; text-decoration: none; }
+button { border: 0; background: none; color: inherit; font: inherit; }
+
+/* ---------- splash ---------- */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+}
+
+.splash-text {
+  letter-spacing: 0.1em;
+  font-size: 22px;
+  animation: splash-jitter 2.1s steps(1) 1;
+}
+
+/* ブラウン管の表示ブレのように、0.3秒ごとに少しだけズレる(明滅はしない) */
+@keyframes splash-jitter {
+  0%, 100% { transform: translate(0, 0); }
+  14.3% { transform: translate(3px, -2px); }
+  28.6% { transform: translate(-4px, 1px); }
+  42.9% { transform: translate(2px, 3px); }
+  57.1% { transform: translate(-3px, -3px); }
+  71.4% { transform: translate(4px, 1px); }
+  85.7% { transform: translate(-2px, -1px); }
+}
+
+/* ---------- tap crosshair(モバイルでタップ位置を示す) ---------- */
+
+.tap-crosshair {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  z-index: 50;
+  display: none;
+  transform: translate(-16px, -16px);
+  pointer-events: none;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><line x1="16" y1="2" x2="16" y2="30" stroke="%23f1ede2" stroke-width="1.5"/><line x1="2" y1="16" x2="30" y2="16" stroke="%23f1ede2" stroke-width="1.5"/></svg>') center / contain no-repeat;
+}
+
+.tap-crosshair.is-visible { display: block; }
+
+/* ---------- header ---------- */
+
+main {
+  max-width: none;
+  margin: 0 auto;
+  padding: 16px 16px 32px;
+}
+
+.page-header {
+  margin-bottom: 32px;
+  letter-spacing: 0.05em;
+}
+
+.page-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- street(ストリートビュー風のメイン表示) ---------- */
+
+.street-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+/* 上段:作品プレビュー / 下段:矢印(選択肢)。枠を分割するのではなく、ひと続きの長方形の中で上下に配置するだけ */
+.street-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+}
+
+.street-cluster-item {
+  flex: none;
+  object-fit: contain;
+  display: block;
+}
+
+/* 近い座標の作品は1つの場所としてまとめ、横並びで表示する。サイズはJS側で枚数と枠の大きさから計算する */
+.street-arrows {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 44%;
+}
+
+/* 選択肢の矢印は、下段の中心から見た方位の位置に線で描く楕円のコンパス(JSがSVGを生成する)。
+   楕円は地面に置いたように縦に潰してある */
+.compass {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.compass-arrow { outline: none; }
+
+.compass-arrow-line {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 1.5;
+  stroke-linejoin: miter;
+  stroke-linecap: butt;
+}
+
+/* タップしやすいよう、矢印の周りに見えない当たり判定を置く */
+.compass-arrow-hit { fill: transparent; }
+
+/* ---------- minimap(縮小表示専用。タップ・クリックには反応しない) ---------- */
+
+/* 座標テキストはマップの左側に、通常のページ内の要素として並べる(固定UIっぽくしない) */
+.minimap-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* マップと、その下の「YOU 緯度 経度」を縦に並べる */
+.minimap-col {
+  width: 38%;
+  flex: none;
+}
+
+/* クリックハンドラは一切付けていないので反応しない */
+.minimap-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+/* 枠より小さく作り、常に周囲へ余白を残す。中心にしたい点はその余白の分だけ中央へ寄せる(世界地図自体は常に全体が収まる)。移動はアニメーションせず、瞬時に新しい位置を反映する */
+.map-layer {
+  position: absolute;
+  width: 60%;
+  height: 60%;
+}
+
+.map-dots {
+  position: absolute;
+  inset: 0;
+}
+
+.map-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  background: var(--paper);
+}
+
+.map-dot.is-self {
+  box-shadow: 0 0 0 4px rgba(241, 237, 226, 0.25);
+}
+
+/* 現在地の点の上に小さく「YOU」 */
+.map-dot.is-self::after {
+  content: "YOU";
+  position: absolute;
+  left: 50%;
+  bottom: 9px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* いま見ている場所の点(赤)。現在地の点より上に重ねる */
+.map-dot.is-view {
+  background: #e0503a;
+  z-index: 1;
+}
+
+/* 現在地から短く伸びるだけの矢印(距離は表さず、方向だけ示す) */
+.gaze-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 1px;
+  background: var(--paper);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.gaze-line::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -3px;
+  border: 3px solid transparent;
+  border-left-color: var(--paper);
+}
+
+/* マップに被らないよう、マップの左側にページ内の要素として表示する(fixedのUI的な浮き表示にはしない) */
+.map-coords {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px;
+  font-size: 14px;
+  text-align: left;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+.map-coords-last:empty { display: none; }
+
+/* マップの下に、ページ内の要素として表示する */
+.map-coords-self {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  text-align: left;
+}
+
+/* ---------- footer ---------- */
+
+.site-footer {
+  max-width: 2200px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.site-footer-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--paper);
+}
+
+/* ---------- site status(インスタのリンクと同じ行。ページの一部として表示) ---------- */
+
+.site-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+}
+
+.site-status span:empty { display: none; }
+
+/* ---------- viewer (lightbox) ---------- */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--ink);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.viewer.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.viewer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 100%;
+}
+
+/* 開いた瞬間は真っ黒。中身は要素ごとに上から順番にフェードインする */
+.viewer-inner > * {
+  opacity: 0;
+  animation: viewer-item-in 0.25s ease-out forwards;
+}
+
+.viewer.is-open .viewer-image-wrap { animation-delay: 0s; }
+.viewer.is-open .viewer-meta > .viewer-index { animation-delay: 0.08s; }
+.viewer.is-open .viewer-meta > h2 { animation-delay: 0.14s; }
+.viewer.is-open .viewer-meta > .viewer-fields { animation-delay: 0.2s; }
+
+@keyframes viewer-item-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 正方形の固定サイズ。どの作品でも同じ大きさで、画像はその中に収まる最大サイズで表示 */
+.viewer-image-wrap {
+  flex: none;
+  width: 30vmin;
+  height: 30vmin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.viewer-image-wrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.viewer-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: center;
+}
+
+.viewer-meta h2 { margin: 0; font-weight: 400; }
+
+.viewer-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  width: 100%;
+  max-width: 420px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.viewer-fields dt { text-transform: uppercase; }
+.viewer-fields dd { margin: 0; }
+.viewer-fields dt[hidden],
+.viewer-fields dd[hidden] { display: none; }
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 720px) {
+  .viewer-image-wrap { max-height: 45vh; }
+}
+
+@media (max-width: 640px) {
+  main { padding: 28px 20px 48px; }
+  .page-header { margin-bottom: 20px; font-size: 14px; }
+  .site-footer { padding: 14px 20px 40px; }
+  .minimap-col { width: 52%; }
+  .map-coords { font-size: 12px; }
+  .map-coords-self { font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .splash { display: none; }
+}
