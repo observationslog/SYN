@@ -48,6 +48,11 @@ function distanceKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
+// 地点aと地点bの、ミニマップ(平らな地図)の上での距離(緯度経度の差をそのまま使う。右端から左端へは回り込まない)
+function flatMapDistance(a, b) {
+  return Math.hypot(b[0] - a[0], b[1] - a[1]);
+}
+
 // 地点aから見た地点bの方位(度、北=0、時計回り)。ミニマップ(平らな地図)の上での方向。
 // 経度の差は素直に引き算するだけで、右端から左端へは回り込まない
 function bearingTo(a, b) {
@@ -284,7 +289,8 @@ function buildStreetAdjacency() {
     }
   }
 
-  // 最小スパニングツリー(Prim法)で全体の接続を保証する
+  // 最小スパニングツリー(Prim法)で全体の接続を保証する。
+  // 橋渡しの「近さ」はミニマップ(平らな地図)の上での近さで決める。地図の端を回り込む近道は使わない
   if (n > 1) {
     const inTree = new Array(n).fill(false);
     inTree[0] = true;
@@ -295,7 +301,7 @@ function buildStreetAdjacency() {
         if (!inTree[i]) continue;
         for (let j = 0; j < n; j += 1) {
           if (inTree[j]) continue;
-          const d = distanceKm(streetClusters[i].coords, streetClusters[j].coords);
+          const d = flatMapDistance(streetClusters[i].coords, streetClusters[j].coords);
           if (!best || d < best.d) best = { i, j, d };
         }
       }
