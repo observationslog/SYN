@@ -331,7 +331,7 @@ const COMPASS_RINGS = 3;
 const COMPASS_RING_FRACTIONS = [0.4, 0.7, 1]; // 内・中・外の輪の半径(外側を1とした比)
 const COMPASS_OVERLAP_DEG = 40; // この角度以内の矢印同士は「重なる」とみなす
 const COMPASS_FLATTEN = 0.6; // 地面を縦に潰す割合
-const COMPASS_DEPTH = 0.3; // 遠近の強さ。大きいほど奥(北)が小さく、手前(南)が大きくなる
+const COMPASS_DEPTH = 0.6; // 遠近の強さ。大きいほど奥(北)が小さく、手前(南)が大きくなる
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function assignCompassRings(items) {
